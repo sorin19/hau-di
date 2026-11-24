@@ -16,8 +16,8 @@ enum AppInfo {
     static let voluntaryPaymentURL = URL(string: "https://pay.cx.ro/hau-di/")!
     /// Lista de preturi Claude (si fast mode / fallback pe modele), citita o data pe saptamana.
     static let pricingURL = URL(string: "https://pay.cx.ro/hau-di/pricing/")!
-    /// Codul sursa (GitHub), dupa publicare (nil = nu se afiseaza).
-    static let sourceURL: URL? = nil
+    /// Codul sursa (GitHub), afisat in Setari → General → About (GPL v3: sursa la indemana).
+    static let sourceURL: URL? = URL(string: "https://github.com/sorin19/hau-di")
     /// Fisierele de licenta incluse in aplicatie (hau-di/Resources/Legal).
     static func legalFile(_ name: String) -> URL? {
         Bundle.main.url(forResource: name, withExtension: "txt")

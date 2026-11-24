@@ -100,6 +100,8 @@ Tools/
   linux-check/    checks without a Mac: swiftc -parse on all the code + unit tests for hau-di/Core
   make_icon.py    regenerates the app icon (blue variant, opaque over the whole surface, so that macOS 26 crops it itself)
   whisper-probe.py  runs Whisper (the app's model and settings) on an audio file and shows each word's probability; requires `brew install whisperkit-cli`
+  publish.sh      commits and pushes your changes to GitHub, after checking that no signing Team, keys or private files go out
+  git-clean-team.sh  git filter that keeps the signing Team (DEVELOPMENT_TEAM) out of commits (see .gitattributes)
 ```
 
 The models are saved in `~/Library/Application Support/hau-di/WhisperKit`. The history: `~/Library/Application Support/hau-di/history.jsonl` (one entry per line, the last 3 months). Bundle ID: `ro.cx.app.hau-di`.
