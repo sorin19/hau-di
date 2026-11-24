@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Ce afiseaza "pastila" plutitoare de jos.
+/// What the floating "pill" at the bottom shows.
 enum OverlayMode: Equatable {
     case hidden
     case recording(handsFree: Bool)
@@ -13,11 +13,11 @@ enum OverlayMode: Equatable {
 
 @MainActor
 final class OverlayModel: ObservableObject {
-    /// Cate niveluri recente tinem: destule ca liniutele sa umple toata pastila.
+    /// How many recent levels we keep: enough for the bars to fill the whole pill.
     static let historyCount = 160
 
     @Published var mode: OverlayMode = .hidden
-    /// Pastila sus (sub bara de meniu) in loc de jos.
+    /// The pill at the top (below the menu bar) instead of the bottom.
     @Published var atTop = false
     @Published var levels: [Float] = Array(repeating: 0, count: OverlayModel.historyCount)
 
@@ -34,7 +34,7 @@ final class OverlayModel: ObservableObject {
     }
 }
 
-/// Panou fara focus: nu fura niciodata tastatura aplicatiei in care dictezi.
+/// A panel without focus: it never steals the keyboard from the app you are dictating into.
 final class OverlayPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
@@ -59,13 +59,13 @@ final class OverlayPanel: NSPanel {
 final class OverlayController {
     let model = OverlayModel()
     var isEnabled = true
-    /// Sus (sub bara de meniu) sau jos (deasupra Dock-ului); se aplica la urmatoarea afisare.
+    /// Top (below the menu bar) or bottom (above the Dock); applied the next time it is shown.
     var atTop = false {
         didSet { model.atTop = atTop }
     }
     private var panel: OverlayPanel?
     private var hideTask: Task<Void, Never>?
-    /// Panoul e transparent si nu primeste click-uri; e mai inalt ca sa incapa mesajele pe 2-3 randuri.
+    /// The panel is transparent and does not receive clicks; it is taller so that messages on 2-3 lines fit.
     private let size = NSSize(width: 400, height: 130)
 
     func show(_ mode: OverlayMode) {
@@ -79,7 +79,7 @@ final class OverlayController {
         panel.orderFrontRegardless()
     }
 
-    /// Afiseaza un mesaj scurt, apoi ascunde pastila.
+    /// Shows a short message, then hides the pill.
     func flash(_ mode: OverlayMode, duration: TimeInterval = 1.4) {
         show(mode)
         hideTask = Task { [weak self] in
@@ -96,8 +96,8 @@ final class OverlayController {
         panel?.orderOut(nil)
     }
 
-    /// Ascunde pastila doar daca a ramas pe o stare fara temporizator (Transcriu…, Corectez…, inregistrare);
-    /// un mesaj scurt (Inserat, eroare) ramane pana i se termina timpul.
+    /// Hides the pill only if it was left in a state without a timer (Transcribing…, Correcting…, recording);
+    /// a short message (Inserted, error) stays until its time runs out.
     func hideIfPersistent() {
         guard hideTask == nil, model.mode != .hidden else { return }
         hide()
@@ -114,7 +114,7 @@ final class OverlayController {
         return panel
     }
 
-    /// Centrat jos, pe ecranul unde e mouse-ul.
+    /// Centered at the bottom, on the screen where the mouse is.
     private func position(_ panel: OverlayPanel) {
         let mouse = NSEvent.mouseLocation
         let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
@@ -145,7 +145,7 @@ struct OverlayView: View {
         .animation(.easeOut(duration: 0.15), value: model.mode)
     }
 
-    /// Aceeasi latime in toate starile: nu mai „sare” cand trece de la inregistrare la transcriere si inserare.
+    /// The same width in every state: it no longer "jumps" when going from recording to transcribing and inserting.
     private static let pillWidth: CGFloat = 340
 
     private var pill: some View {
@@ -160,13 +160,13 @@ struct OverlayView: View {
             .padding(model.atTop ? .top : .bottom, 6)
     }
 
-    /// Culorile de baza ale paletei (cele mai puternice), pe orice tema: pe sticla, varianta deschisa se pierde.
+    /// The palette's base colors (the strongest ones), on any theme: on glass, the lighter variant gets lost.
     private static func strong(_ tone: BrandTone) -> Color {
         tone.color(onDark: true)
     }
 
-    /// Trei zone, la fel in toate starile: rombul in stanga si lacatul in dreapta au spatiul lor rezervat
-    /// (si cand lacatul nu apare); mijlocul (unda sau textul) ocupa tot restul.
+    /// Three zones, the same in every state: the rhombus on the left and the lock on the right have reserved space
+    /// (even when the lock is not shown); the middle (waveform or text) takes all the rest.
     private var pillContent: some View {
         HStack(spacing: 8) {
             leading
@@ -178,7 +178,7 @@ struct OverlayView: View {
         }
     }
 
-    /// Stanga: rombul de status.
+    /// Left: the status rhombus.
     @ViewBuilder
     private var leading: some View {
         switch model.mode {
@@ -204,7 +204,7 @@ struct OverlayView: View {
         }
     }
 
-    /// Mijloc: unda (de la un capat la altul al zonei) sau textul, centrat.
+    /// Middle: the waveform (from one end of the zone to the other) or the text, centered.
     @ViewBuilder
     private var center: some View {
         switch model.mode {
@@ -223,7 +223,7 @@ struct OverlayView: View {
         }
     }
 
-    /// Dreapta: lacatul la hands-free; altfel spatiul ramane liber.
+    /// Right: the lock in hands-free mode; otherwise the space stays empty.
     @ViewBuilder
     private var trailing: some View {
         if case .recording(handsFree: true) = model.mode {
@@ -243,8 +243,8 @@ struct OverlayView: View {
     }
 }
 
-/// Unda de inregistrare: liniute subtiri pe toata latimea, cate una pentru fiecare nivel recent al vocii
-/// (cel mai nou in dreapta).
+/// The recording waveform: thin bars across the whole width, one for each recent voice level
+/// (the newest on the right).
 struct WaveformView: View {
     let levels: [Float]
     var color: Color
@@ -271,14 +271,14 @@ struct WaveformView: View {
     }
 }
 
-/// Fundalul pastilei: sticla sistemului. Pe macOS 26, Liquid Glass; pe macOS 14-15, estomparea clasica.
-/// Amandoua urmeaza setarile din System Settings: tema deschisa/inchisa, Reduce Transparency, Increase Contrast.
+/// The pill's background: the system glass. On macOS 26, Liquid Glass; on macOS 14-15, the classic blur.
+/// Both follow the options in System Settings: light/dark theme, Reduce Transparency, Increase Contrast.
 private struct PillGlass: ViewModifier {
     private let shape = RoundedRectangle(cornerRadius: 22, style: .continuous)
     @Environment(\.colorScheme) private var colorScheme
 
-    /// Chenar de 1 px (1 pt), invers fata de tema sistemului: negru pe tema deschisa (pastila alba),
-    /// alb pe tema inchisa (pastila neagra). La fel sus sau jos.
+    /// A 1 px (1 pt) border, the inverse of the system theme: black on the light theme (white pill),
+    /// white on the dark theme (black pill). The same at the top or at the bottom.
     private var border: Color { colorScheme == .dark ? .white : .black }
 
     @ViewBuilder
@@ -304,13 +304,13 @@ private struct PillGlass: ViewModifier {
     }
 }
 
-/// Estomparea a ceea ce e in spatele ferestrei (NSVisualEffectView), pentru macOS 14-15.
+/// Blur of whatever is behind the window (NSVisualEffectView), for macOS 14-15.
 private struct VisualEffectBackground: NSViewRepresentable {
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
         view.material = .popover
         view.blendingMode = .behindWindow
-        // Panoul nu devine niciodata activ; fara asta, macOS l-ar desena ca pe o fereastra inactiva.
+        // The panel never becomes active; without this, macOS would draw it as an inactive window.
         view.state = .active
         return view
     }

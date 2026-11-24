@@ -22,7 +22,7 @@ final class WordConfidenceTests: XCTestCase {
     }
 
     func testEdgePunctuationDoesNotLowerTheWord() {
-        // O virgula sau un punct nesigur nu face nesigur cuvantul.
+        // An unsure comma or period does not make the word unsure.
         let words = WordConfidence.words(from: [piece(" gata", -0.1), piece(".", -3), piece(" (", -2), piece("ok", -0.2),
                                                 piece(")", -2)])
         XCTAssertEqual(words.map(\.text), [" gata.", " (ok)"])
@@ -40,7 +40,7 @@ final class WordConfidenceTests: XCTestCase {
         let words = WordConfidence.words(from: [piece("", -9), piece(" ,", -2), piece(" x")])
         XCTAssertEqual(words.map(\.text), [" ,", " x"])
         XCTAssertEqual(words[0].probability, (exp(-2) * 1000).rounded() / 1000)
-        XCTAssertEqual(words[1].probability, 1, "fara log-probabilitati nu marcam cuvantul")
+        XCTAssertEqual(words[1].probability, 1, "without log-probabilities we do not mark the word")
     }
 
     func testFirstPieceWithoutSpaceStartsAWord() {
@@ -77,7 +77,7 @@ final class WordConfidenceTests: XCTestCase {
         XCTAssertFalse(off.contains("unsure about"))
         XCTAssertTrue(on.contains("## Words the recognizer was unsure about"))
         XCTAssertTrue(on.contains("la ⟦Audi⟧"))
-        XCTAssertTrue(on.hasSuffix(off.components(separatedBy: "\n\n").last!), "sectiunea de output ramane ultima")
+        XCTAssertTrue(on.hasSuffix(off.components(separatedBy: "\n\n").last!), "the output section stays last")
         XCTAssertEqual(WordConfidence.stripMarkers("am ⟦trimis⟧ la ⟦Audi⟧."), "am trimis la Audi.")
     }
 

@@ -3,22 +3,22 @@ import OSLog
 
 enum AppInfo {
     static let bundleID = Bundle.main.bundleIdentifier ?? "ro.cx.app.hau-di"
-    /// ID-uri folosite de versiuni mai vechi (inainte de redenumirea Haudi → hau-di, 2026-11-23);
-    /// setarile si cheia API se muta automat de pe ele.
+    /// IDs used by older versions (before the Haudi → hau-di rename, 2026-11-23);
+    /// the settings and the API key are moved from them automatically.
     static let legacyBundleIDs = ["ro.cx.app.haudi", "ro.haudi.app"]
-    /// Autorul si firma, afisate in Setari → General → Despre.
+    /// The author and the company, shown in Settings → General → About.
     static let author = "Sorin Buturugeanu"
     static let company = "CEXA DIGITAL SRL"
-    /// Codul fiscal al firmei (fara RO), afisat langa nume: "CEXA DIGITAL SRL [CIF 35370537]".
+    /// The company's tax ID (without "RO"), shown next to the name: "CEXA DIGITAL SRL [CIF 35370537]".
     static let companyCIF = "35370537"
     static let website = URL(string: "https://cx.ro")!
-    /// Pagina de plati voluntare.
+    /// The voluntary payments page.
     static let voluntaryPaymentURL = URL(string: "https://pay.cx.ro/hau-di/")!
-    /// Lista de preturi Claude (si fast mode / fallback pe modele), citita o data pe saptamana.
+    /// The Claude price list (plus fast mode / fallback per model), fetched once a week.
     static let pricingURL = URL(string: "https://pay.cx.ro/hau-di/pricing/")!
-    /// Codul sursa (GitHub), afisat in Setari → General → About (GPL v3: sursa la indemana).
+    /// The source code (GitHub), shown in Settings → General → About (GPL v3: the source within easy reach).
     static let sourceURL: URL? = URL(string: "https://github.com/sorin19/hau-di")
-    /// Fisierele de licenta incluse in aplicatie (hau-di/Resources/Legal).
+    /// The license files bundled with the app (hau-di/Resources/Legal).
     static func legalFile(_ name: String) -> URL? {
         Bundle.main.url(forResource: name, withExtension: "txt")
     }
@@ -30,9 +30,9 @@ enum AppInfo {
 }
 
 enum AppPaths {
-    /// ~/Library/Application Support/hau-di (nu folosim ~/Documents ca sa evitam promptul TCC).
-    /// La prima folosire dupa redenumire, folderul vechi „Haudi” (modele, istoric) se muta aici: pe acelasi disc
-    /// e doar o redenumire, deci instantanee, si modelele nu se mai descarca o data.
+    /// ~/Library/Application Support/hau-di (not ~/Documents, to avoid the TCC prompt).
+    /// On first use after the rename, the old "Haudi" folder (models, history) is moved here: on the same disk
+    /// it is only a rename, so it is instant, and the models are not downloaded a second time.
     static let applicationSupport: URL = {
         let fileManager = FileManager.default
         let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -45,24 +45,24 @@ enum AppPaths {
         return url
     }()
 
-    /// Radacina de download pentru WhisperKit (modele + tokenizer).
+    /// Download root for WhisperKit (models + tokenizer).
     static var whisperKitBase: URL {
         let url = applicationSupport.appendingPathComponent("WhisperKit", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }
 
-    /// Istoricul (JSON Lines, ultimele 3 luni).
+    /// The history (JSON Lines, last 3 months).
     static var historyFile: URL {
         applicationSupport.appendingPathComponent("history.jsonl")
     }
 
-    /// Lista de modele Claude din API (cache) + parametrii refuzati de fiecare model.
+    /// The list of Claude models from the API (cached) + the parameters each model rejected.
     static var modelsFile: URL {
         applicationSupport.appendingPathComponent("claude-models.json")
     }
 
-    /// Formatul vechi (ultimele 200, un singur array JSON); se migreaza automat.
+    /// The old format (the last 200 entries, a single JSON array); migrated automatically.
     static var legacyHistoryFile: URL {
         applicationSupport.appendingPathComponent("history.json")
     }

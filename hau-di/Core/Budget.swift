@@ -1,12 +1,12 @@
 import Foundation
 
-/// Cat s-a cheltuit pe corecturile Claude in luna curenta (estimat din tokeni x pretul de lista).
-/// Se tine separat de istoric, ca bugetul sa conteze si cand istoricul e oprit sau sters.
+/// How much was spent on Claude corrections in the current month (estimated from tokens x list price).
+/// Kept separate from the history, so the budget still counts when the history is turned off or cleared.
 public struct MonthlySpend: Codable, Equatable, Sendable {
-    /// Luna, "2026-11".
+    /// The month, "2026-11".
     public var month: String
     public var spentUSD: Double
-    /// Avertismentul de 80% a fost aratat luna asta.
+    /// The 80% warning has been shown this month.
     public var warned: Bool
 
     public init(month: String, spentUSD: Double = 0, warned: Bool = false) {
@@ -20,13 +20,13 @@ public struct MonthlySpend: Codable, Equatable, Sendable {
         return String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
     }
 
-    /// Aceeasi stare in luna ei; intr-o luna noua, alta, de la zero.
+    /// The same state within its month; in a new month, a fresh one starting from zero.
     public func current(at date: Date, calendar: Calendar = .current) -> MonthlySpend {
         let key = Self.monthKey(for: date, calendar: calendar)
         return key == month ? self : MonthlySpend(month: key)
     }
 
-    /// Adauga costul unei corecturi. `crossedWarning`: tocmai s-a trecut de 80% din buget (o singura data pe luna).
+    /// Adds the cost of a correction. `crossedWarning`: spending just crossed 80% of the budget (only once a month).
     public func adding(_ cost: Double, limit: Double?, at date: Date,
                        calendar: Calendar = .current) -> (spend: MonthlySpend, crossedWarning: Bool) {
         var next = current(at: date, calendar: calendar)
@@ -40,7 +40,7 @@ public struct MonthlySpend: Codable, Equatable, Sendable {
     }
 }
 
-/// Starea bugetului lunar: fara limita, sub 80%, de la 80% (avertisment), atins (corectia se opreste).
+/// The monthly budget status: no limit, under 80%, from 80% on (warning), reached (correction stops).
 public enum BudgetStatus: Equatable, Sendable {
     case off, ok, warning, exceeded
 

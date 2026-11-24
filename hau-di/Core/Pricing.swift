@@ -1,6 +1,6 @@
 import Foundation
 
-/// Preturile unui model, in USD per milion de tokeni (cele efective pentru o cerere: prompt lung, fast mode).
+/// A model's prices, in USD per million tokens (the effective ones for a request: long prompt, fast mode).
 public struct ModelPricing: Sendable, Equatable {
     public var input: Double
     public var cacheWrite5m: Double
@@ -14,19 +14,20 @@ public struct ModelPricing: Sendable, Equatable {
         self.output = output
     }
 
-    /// Fast mode: multiplicatorii de cache se aplica peste pretul fast.
+    /// Fast mode: the cache multipliers apply on top of the fast price.
     public func scaled(by factor: Double) -> ModelPricing {
         ModelPricing(input: input * factor, cacheWrite5m: cacheWrite5m * factor,
                      cacheRead: cacheRead * factor, output: output * factor)
     }
 }
 
-/// Lista de preturi + ce nu spune /v1/models (fast mode, fallback la refuz), tinuta de autor in price.json pe pay.cx.ro
-/// (servita la https://pay.cx.ro/hau-di/pricing/) dupa https://platform.claude.com/docs/en/about-claude/pricing.
-/// Aplicatia o citeste o data pe saptamana; pana atunci (sau fara retea) foloseste copia inclusa (`bundled`).
-/// In setari apar doar modelele care sunt si in /v1/models (accesibile cheii), si aici (cu pret cunoscut).
+/// The price list + what /v1/models does not say (fast mode, fallback on refusal), kept by the author in price.json
+/// on pay.cx.ro (served at https://pay.cx.ro/hau-di/pricing/), based on
+/// https://platform.claude.com/docs/en/about-claude/pricing.
+/// The app fetches it once a week; until then (or offline) it uses the bundled copy (`bundled`).
+/// The settings show only the models that are both in /v1/models (accessible to the key) and here (known price).
 public struct PriceList: Codable, Equatable, Sendable {
-    /// Alte preturi cand promptul (intrare + cache) depaseste `above` tokeni (ex: Haiku 5.5 peste 100.000).
+    /// Different prices when the prompt (input + cache) exceeds `above` tokens (e.g. Haiku 5.5 above 100,000).
     public struct LongPrompt: Codable, Equatable, Sendable {
         public var above: Int
         public var input: Double
@@ -42,20 +43,20 @@ public struct PriceList: Codable, Equatable, Sendable {
     }
 
     public struct Entry: Codable, Equatable, Sendable {
-        /// ID-ul din /v1/models, fara data: "claude-opus-4-5" acopera si "claude-opus-4-5-20251101".
+        /// The ID from /v1/models, without the date: "claude-opus-4-5" also covers "claude-opus-4-5-20251101".
         public var id: String
         public var input: Double
         public var output: Double
-        /// Scrierea in cache pe 5 minute; lipsa = 1,25 x input.
+        /// The 5-minute cache write; missing = 1.25 x input.
         public var cacheWrite: Double?
-        /// Citirea din cache; lipsa = 0,1 x input.
+        /// The cache read; missing = 0.1 x input.
         public var cacheRead: Double?
         public var longPrompt: LongPrompt?
-        /// Fast mode pe Claude API, fara beta (`speed: "fast"`).
+        /// Fast mode on the Claude API, without a beta (`speed: "fast"`).
         public var fast: Bool?
-        /// Cat costa fast mode fata de pretul standard; lipsa = 2.
+        /// How much fast mode costs relative to the standard price; missing = 2.
         public var fastMultiplier: Double?
-        /// Fallback server-side la refuz (`fallbacks: "default"`).
+        /// Server-side fallback on refusal (`fallbacks: "default"`).
         public var fallbacks: Bool?
 
         public init(id: String, input: Double, output: Double, cacheWrite: Double? = nil, cacheRead: Double? = nil,
@@ -82,7 +83,7 @@ public struct PriceList: Codable, Equatable, Sendable {
         public var supportsFastMode: Bool { fast == true }
         public var supportsServerSideFallback: Bool { fallbacks == true }
 
-        /// Preturile pentru o cerere: cu prompt lung, daca e cazul, si inmultite pentru fast mode.
+        /// The prices for a request: the long-prompt ones if applicable, and multiplied for fast mode.
         public func pricing(promptTokens: Int, fast: Bool) -> ModelPricing {
             var price: ModelPricing
             if let long = longPrompt, promptTokens > long.above {
@@ -96,7 +97,7 @@ public struct PriceList: Codable, Equatable, Sendable {
             return price
         }
 
-        /// Valori pozitive, ID de model Claude, multiplicator fast de cel putin 1.
+        /// Positive values, a Claude model ID, a fast multiplier of at least 1.
         var isValid: Bool {
             let optional = [cacheWrite, cacheRead, longPrompt?.cacheWrite, longPrompt?.cacheRead].compactMap { $0 }
             let required = [input, output] + (longPrompt.map { [$0.input, $0.output] } ?? [])
@@ -109,18 +110,18 @@ public struct PriceList: Codable, Equatable, Sendable {
     }
 
     public enum ValidationError: Error, Equatable {
-        /// Format necunoscut (fisier pentru o versiune mai noua a aplicatiei).
+        /// Unknown format (a file for a newer version of the app).
         case format(Int)
         case empty
-        /// Model cu valori gresite sau ID repetat.
+        /// A model with invalid values or a duplicate ID.
         case invalid(String)
     }
 
-    /// 1 = formatul de mai sus. Un format nou poate fi publicat fara sa strice versiunile vechi.
+    /// 1 = the format above. A new format can be published without breaking old versions.
     public var format: Int
-    /// Ziua ultimei actualizari ("2026-11-23"), scrisa de mana in fisier.
+    /// The day of the last update ("2026-11-23"), written by hand in the file.
     public var updated: String?
-    /// Cand a fost salvat ultima data price.json pe server ("2026-11-24 10:15:00"); il adauga serverul.
+    /// When price.json was last saved on the server ("2026-11-24 10:15:00"); the server adds it.
     public var modified: String?
     public var source: String?
     public var models: [Entry]
@@ -133,10 +134,10 @@ public struct PriceList: Codable, Equatable, Sendable {
         self.models = models
     }
 
-    /// Momentul listei, pentru „castiga cea mai noua” si pentru afisare: `modified`, altfel `updated`.
+    /// The list's timestamp, for "newest wins" and for display: `modified`, otherwise `updated`.
     public var stamp: String { modified ?? updated ?? "" }
 
-    /// Citeste si verifica o lista; una gresita e refuzata intreaga (aplicatia o pastreaza pe cea de dinainte).
+    /// Reads and validates a list; an invalid one is rejected as a whole (the app keeps the previous one).
     public static func decode(_ data: Data) throws -> PriceList {
         let list = try JSONDecoder().decode(PriceList.self, from: data)
         guard list.format == 1 else { throw ValidationError.format(list.format) }
@@ -148,8 +149,8 @@ public struct PriceList: Codable, Equatable, Sendable {
         return list
     }
 
-    /// Intrarea unui model: ID exact sau ID + sufix de data ("-20261101"). nil daca modelul nu e in lista,
-    /// ca un model nou (ex: "claude-opus-5-6") sa nu primeasca din greseala pretul altuia.
+    /// A model's entry: exact ID or ID + date suffix ("-20261101"). nil if the model is not in the list,
+    /// so that a new model (e.g. "claude-opus-5-6") does not get another model's price by mistake.
     public func entry(for model: String) -> Entry? {
         models.first { entry in
             if model == entry.id { return true }
@@ -163,7 +164,7 @@ public struct PriceList: Codable, Equatable, Sendable {
         entry(for: model)?.pricing(promptTokens: promptTokens, fast: fast)
     }
 
-    /// "$4 / $20" (intrare / iesire, per milion de tokeni), pentru lista de modele; nil daca pretul nu e cunoscut.
+    /// "$4 / $20" (input / output, per million tokens), for the model list; nil if the price is unknown.
     public func label(for model: String) -> String? {
         guard let price = pricing(for: model) else { return nil }
         return Self.dollars(price.input) + " / " + Self.dollars(price.output)
@@ -173,7 +174,7 @@ public struct PriceList: Codable, Equatable, Sendable {
         value == value.rounded() ? String(format: "$%.0f", value) : String(format: "$%.2f", value)
     }
 
-    /// Copia inclusa in aplicatie: price.json de pe pay.cx.ro (servit la /hau-di/pricing/), la data din `updated`.
+    /// The copy bundled with the app: price.json from pay.cx.ro (served at /hau-di/pricing/) as of `updated`.
     public static let bundled: PriceList = (try? decode(Data(bundledJSON.utf8))) ?? PriceList(models: [])
 
     static let bundledJSON = #"""
@@ -207,7 +208,7 @@ public struct PriceList: Codable, Equatable, Sendable {
 """#
 }
 
-/// Tokenii si costul unei corecturi Claude (salvate in istoric).
+/// The tokens and cost of a Claude correction (saved in the history).
 public struct CorrectionUsage: Codable, Hashable, Sendable {
     public var model: String
     public var inputTokens: Int
@@ -215,7 +216,7 @@ public struct CorrectionUsage: Codable, Hashable, Sendable {
     public var cacheReadTokens: Int
     public var cacheWriteTokens: Int
     public var fastMode: Bool
-    /// nil daca modelul nu are pret in lista.
+    /// nil if the model has no price in the list.
     public var costUSD: Double?
 
     public init(model: String, inputTokens: Int, outputTokens: Int, cacheReadTokens: Int, cacheWriteTokens: Int,
@@ -244,7 +245,7 @@ public struct CorrectionUsage: Codable, Hashable, Sendable {
         return total / 1_000_000
     }
 
-    /// Din raspunsul API: modelul care a raspuns efectiv (poate fi fallback-ul) si viteza folosita.
+    /// From the API response: the model that actually responded (may be the fallback) and the speed used.
     public static func from(response: MessagesResponse, requestedModel: String, fastRequested: Bool,
                             prices: PriceList = .bundled) -> CorrectionUsage? {
         guard let usage = response.usage else { return nil }
@@ -262,7 +263,7 @@ public struct CorrectionUsage: Codable, Hashable, Sendable {
 }
 
 public enum CostFormat {
-    /// $0.0041 pentru sume mici, $0.123 sub un dolar, $12.34 peste.
+    /// $0.0041 for small amounts, $0.123 under one dollar, $12.34 above.
     public static func usd(_ value: Double) -> String {
         if value == 0 { return "$0" }
         if value < 0.01 { return String(format: "$%.4f", value) }

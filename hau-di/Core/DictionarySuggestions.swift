@@ -1,16 +1,16 @@
 import Foundation
 
-/// Un termen propus pentru Dictionar: un cuvant pe care Whisper l-a auzit gresit si Claude l-a corectat.
+/// A term suggested for the Dictionary: a word that Whisper misheard and Claude corrected.
 public struct DictionarySuggestion: Identifiable, Hashable, Sendable {
-    /// Forma scrisa de Claude, fara terminatia romaneasca legata cu cratima ("border-ul" -> "border").
+    /// The form Claude wrote, without the hyphenated Romanian ending ("border-ul" -> "border").
     public var term: String
-    /// Cheia de comparare: litere mici, fara diacritice, fara semne si spatii.
+    /// The comparison key: lowercase, no diacritics, no punctuation or spaces.
     public var key: String
-    /// Ce a auzit Whisper, cu numarul de aparitii (cele mai dese primele).
+    /// What Whisper heard, with the number of occurrences (most frequent first).
     public var heard: [HeardForm]
-    /// De cate ori a corectat Claude termenul.
+    /// How many times Claude corrected the term.
     public var count: Int
-    /// Increderea medie a lui Whisper in cuvintele auzite gresit (nil daca dictarile nu au probabilitati).
+    /// Whisper's average confidence in the misheard words (nil if the dictations have no probabilities).
     public var averageProbability: Double?
     public var lastSeen: Date
 
@@ -22,10 +22,10 @@ public struct HeardForm: Hashable, Sendable {
     public var count: Int
 }
 
-/// Sugestiile pentru Dictionar, din istoric: unde textul final al lui Claude difera de transcrierea lui Whisper
-/// printr-un cuvant (sau cateva), iar cuvantul corectat arata a termen (nume, cuvant englezesc, acronim).
+/// Dictionary suggestions from the history: where Claude's final text differs from Whisper's transcript by one word
+/// (or a few), and the corrected word looks like a term (a name, an English word, an acronym).
 public enum DictionarySuggestions {
-    /// Cel mult atatea cuvinte de fiecare parte a unei corecturi; mai mult e o reformulare, nu un termen auzit gresit.
+    /// At most this many words on each side of a correction; more is a rephrasing, not a misheard term.
     static let maxHeardWords = 4
     static let maxWrittenWords = 3
     static let maxTermLength = 40
@@ -33,7 +33,7 @@ public enum DictionarySuggestions {
     public static func compute(from entries: [HistoryEntry], ignoring ignored: Set<String> = [],
                                limit: Int = 20) -> [DictionarySuggestion] {
         struct Accumulator {
-            /// Formele scrise de Claude: de cate ori si cand ultima data (se propune cea mai recenta).
+            /// The forms Claude wrote: how many times and when last seen (the most recent one is suggested).
             var forms: [String: (count: Int, last: Date)] = [:]
             var heard: [String: Int] = [:]
             var count = 0
@@ -61,8 +61,8 @@ public enum DictionarySuggestions {
 
         let suggestions = byKey.compactMap { key, acc -> DictionarySuggestion? in
             guard !ignored.contains(key) else { return nil }
-            // Un cuvant obisnuit (fara semne de termen) apare doar daca s-a repetat si nu e doar alta forma
-            // gramaticala a aceluiasi cuvant ("facem" -> "faci").
+            // An ordinary word (no signs of being a term) is shown only if it was repeated and is not just another
+            // grammatical form of the same word ("facem" -> "faci").
             if !acc.termLike, acc.count < 2 || acc.inflectionOnly { return nil }
             let term = acc.forms.max { ($0.value.last, $0.value.count, $1.key) < ($1.value.last, $1.value.count, $0.key) }?.key ?? key
             let heard = acc.heard.map { HeardForm(text: $0.key, count: $0.value) }
@@ -74,7 +74,7 @@ public enum DictionarySuggestions {
         return Array(suggestions.sorted { ($0.count, $0.lastSeen, $1.key) > ($1.count, $1.lastSeen, $0.key) }.prefix(limit))
     }
 
-    // MARK: - O dictare
+    // MARK: - A single dictation
 
     struct HeardWord {
         var text: String
@@ -90,7 +90,7 @@ public enum DictionarySuggestions {
         var inflection: Bool
     }
 
-    /// Corecturile dintr-o dictare care pot fi termeni de dictionar.
+    /// The corrections in a dictation that may be dictionary terms.
     static func occurrences(in entry: HistoryEntry) -> [Occurrence] {
         let heardWords: [HeardWord]
         if let words = entry.words, !words.isEmpty {
@@ -108,7 +108,7 @@ public enum DictionarySuggestions {
             let heardCount = block.heard.count
             let writtenCount = block.written.count
             guard heardCount <= maxHeardWords, writtenCount <= maxWrittenWords else { continue }
-            // Acelasi numar de cuvinte: perechi cuvant cu cuvant ("KH1, KH-mod-ul" -> "chown-ul, chmod-ul").
+            // Same number of words: word-by-word pairs ("KH1, KH-mod-ul" -> "chown-ul, chmod-ul").
             let pairs: [(Range<Int>, Range<Int>)] = heardCount == writtenCount && heardCount > 1
                 ? (0..<heardCount).map { offset in
                     (block.heard.lowerBound + offset..<block.heard.lowerBound + offset + 1,
@@ -125,8 +125,8 @@ public enum DictionarySuggestions {
         return result
     }
 
-    /// Termenii dintr-o corectura (heard -> written). Dintr-o corectura de mai multe cuvinte raman doar cele care
-    /// arata a termen ("accesibil .htaccess" -> ".htaccess", "HI cu sonet" -> "Haiku", "Sonnet").
+    /// The terms in a correction (heard -> written). From a multi-word correction, only the words that look like
+    /// terms are kept ("accesibil .htaccess" -> ".htaccess", "HI cu sonet" -> "Haiku", "Sonnet").
     static func candidates(heard heardWords: [HeardWord], written: [String], sentenceStart: Bool) -> [Occurrence] {
         let heard = trimEdges(heardWords.map { $0.text }.joined(separator: " "))
         let heardKey = key(heard)
@@ -144,13 +144,13 @@ public enum DictionarySuggestions {
             guard !termKey.isEmpty, term.count <= maxTermLength, term.contains(where: \.isLetter), !term.contains("/"),
                   !stopwords.contains(termKey), termKey != heardKey, termKey != heardBaseKey,
                   !heardKeys.contains(termKey) else { continue }
-            // Intr-o corectura de mai multe cuvinte, un cuvant auzit corect dar lipit de altul ramane pe dinafara:
-            // "accesibil.htacces" -> "accesibil .htaccess" propune doar ".htaccess".
+            // In a multi-word correction, a word that was heard correctly but glued to another one is left out:
+            // "accesibil.htacces" -> "accesibil .htaccess" suggests only ".htaccess".
             if written.count > 1, termKey.count >= 4, heardKeys.contains(where: { $0.hasPrefix(termKey) }) { continue }
             let termLike = base.stripped || isTermLike(term, sentenceStart: startsSentence)
             if !termLike {
-                // Un cuvant obisnuit: doar singur in corectura, de cel putin 4 litere si fara diacritice romanesti
-                // (un cuvant romanesc corectat e gramatica, nu un termen de dictionar).
+                // An ordinary word: only if it is alone in the correction, has at least 4 letters and no Romanian
+                // diacritics (a corrected Romanian word is grammar, not a dictionary term).
                 if written.count > 1 || termKey.count < 4 || term.contains(where: { romanianLetters.contains($0) }) { continue }
             }
             let inflection = heardKeys.contains { sharedPrefixLength($0, termKey) >= 3 }
@@ -162,15 +162,15 @@ public enum DictionarySuggestions {
 
     static let romanianLetters: Set<Character> = ["ă", "â", "î", "ș", "ț", "ş", "ţ", "Ă", "Â", "Î", "Ș", "Ț", "Ş", "Ţ"]
 
-    // MARK: - Termeni
+    // MARK: - Terms
 
-    /// Litere mici, fara diacritice, fara semne si spatii: "JSON-ul," -> "jsonul", "/hau-di" -> "haudi".
+    /// Lowercase, no diacritics, no punctuation or spaces: "JSON-ul," -> "jsonul", "/hau-di" -> "haudi".
     public static func key(_ text: String) -> String {
         let folded = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "ro_RO"))
         return String(folded.unicodeScalars.filter { CharacterSet.alphanumerics.contains($0) }.map(Character.init))
     }
 
-    /// Terminatiile romanesti legate cu cratima de un cuvant strain: JSON-ul, commit-uri, PHP-ului, border-ele.
+    /// Romanian endings attached with a hyphen to a foreign word: JSON-ul, commit-uri, PHP-ului, border-ele.
     static let romanianSuffixes: Set<String> = ["ul", "ului", "uri", "urile", "urilor", "ii", "iei", "ilor", "ele", "elor",
                                                 "le", "lor", "lui", "ul-ul"]
 
@@ -192,19 +192,19 @@ public enum DictionarySuggestions {
         return String(characters)
     }
 
-    /// Arata a termen (nume, acronim, cuvant englezesc), nu a cuvant romanesc obisnuit.
+    /// Looks like a term (a name, an acronym, an English word), not like an ordinary Romanian word.
     static func isTermLike(_ term: String, sentenceStart: Bool) -> Bool {
-        // Semne sigure: majuscula in interiorul cuvantului (JSON, GitHub), cifre, puncte si alte simboluri.
+        // Sure signs: an uppercase letter inside the word (JSON, GitHub), digits, dots and other symbols.
         if term.dropFirst().contains(where: \.isUppercase) { return true }
         if term.contains(where: \.isNumber) { return true }
         if term.contains(where: { "./_@#+&".contains($0) }) { return true }
-        // Un cuvant cu diacritice romanesti e romanesc, chiar daca incepe cu majuscula ("Dicționar").
+        // A word with Romanian diacritics is Romanian, even if it starts with a capital letter ("Dicționar").
         if term.contains(where: { romanianLetters.contains($0) }) { return false }
-        // Majuscula initiala conteaza doar in mijlocul propozitiei (Claude, Apache).
+        // An initial capital letter counts only in the middle of a sentence (Claude, Apache).
         if !sentenceStart, term.first?.isUppercase == true { return true }
         let lower = term.lowercased()
         if lower.contains(where: { "wykq".contains($0) }) { return true }
-        // Litere duble si grupuri rare in romana ("cc" lipseste: accesibil, succes).
+        // Double letters and letter groups that are rare in Romanian ("cc" is left out: accesibil, succes).
         let patterns = ["bb", "dd", "ff", "gg", "ll", "mm", "pp", "rr", "ss", "tt", "zz",
                         "th", "sh", "ck", "oo", "ee", "ph"]
         return patterns.contains { lower.contains($0) }
@@ -214,7 +214,7 @@ public enum DictionarySuggestions {
         zip(a, b).prefix { $0 == $1 }.count
     }
 
-    /// Cuvinte de legatura si foarte uzuale (fara diacritice): nu sunt termeni de dictionar.
+    /// Function words and very common words (without diacritics): they are not dictionary terms.
     static let stopwords: Set<String> = [
         "si", "sa", "ca", "de", "la", "in", "cu", "pe", "din", "pentru", "care", "ce", "nu", "e", "este", "sunt", "o",
         "un", "una", "unui", "unei", "al", "ai", "ale", "a", "am", "au", "ar", "as", "eu", "tu", "el", "ea", "noi", "voi",
@@ -225,14 +225,14 @@ public enum DictionarySuggestions {
         "of", "and", "or", "is", "it", "on", "for", "etc",
     ]
 
-    // MARK: - Diferenta pe cuvinte
+    // MARK: - Word-level diff
 
-    /// Blocurile in care cele doua texte difera (ambele parti nevide), dupa cea mai lunga subsecventa comuna de chei.
+    /// The blocks where the two texts differ (both sides non-empty), based on the longest common subsequence of keys.
     static func replacements(heard: [String], written: [String]) -> [(heard: Range<Int>, written: Range<Int>)] {
         let n = heard.count
         let m = written.count
         guard n > 0, m > 0 else { return [] }
-        // lcs[i][j] = lungimea celei mai lungi subsecvente comune pentru heard[i...] si written[j...]
+        // lcs[i][j] = length of the longest common subsequence of heard[i...] and written[j...]
         var lcs = Array(repeating: Array(repeating: 0, count: m + 1), count: n + 1)
         for i in stride(from: n - 1, through: 0, by: -1) {
             for j in stride(from: m - 1, through: 0, by: -1) {

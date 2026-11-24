@@ -9,10 +9,10 @@ final class HotkeyTests: XCTestCase {
         XCTAssertEqual(ModifierKey.pressedKeys(flags: 0x0080_0100), [.function])
         XCTAssertEqual(ModifierKey.pressedKeys(flags: 0x0008_0000 | 0x40), [.rightOption])
         XCTAssertEqual(ModifierKey.pressedKeys(flags: 0x0010_0000 | 0x08 | 0x0008_0000 | 0x20), [.leftCommand, .leftOption])
-        // Bitul de familie fara bit de parte: deducem din keyCode-ul evenimentului.
+        // Family bit without a side bit: we infer the side from the event's keyCode.
         XCTAssertEqual(ModifierKey.pressedKeys(flags: 0x0008_0000, changedKeyCode: 61), [.rightOption])
         XCTAssertEqual(ModifierKey.pressedKeys(flags: 0x0004_0000), [.leftControl])
-        // Bit de parte ramas fara familie activa -> ignorat.
+        // A side bit left without an active family -> ignored.
         XCTAssertEqual(ModifierKey.pressedKeys(flags: 0x40), [])
         XCTAssertEqual(ModifierKey.pressedKeys(flags: 0x100), [])
     }
@@ -62,7 +62,7 @@ final class HotkeyTests: XCTestCase {
     }
 
     func testLongHoldIgnoresOtherKeys() {
-        // Dupa 1,5 s de dictare, o tasta sau un modificator in plus (ex: ca sa opresti screensaver-ul) nu o mai anuleaza.
+        // After 1.5 s of dictation, an extra key or modifier (e.g. to stop the screensaver) no longer cancels it.
         var sm = HotkeyStateMachine(hotkey: .fn)
         XCTAssertEqual(sm.modifiersChanged([.function], at: 0), [.pressBegan])
         XCTAssertEqual(sm.keyDown(at: 1.4), [.pressAborted])
@@ -311,7 +311,7 @@ final class CorrectionTests: XCTestCase {
     }
 }
 
-// MARK: - Client cu URLProtocol mock (fara retea)
+// MARK: - Client with a mock URLProtocol (no network)
 
 final class MockURLProtocol: URLProtocol {
     nonisolated(unsafe) static var handler: ((URLRequest, Data?) -> (Int, Data))?
@@ -387,7 +387,7 @@ final class ClientTests: XCTestCase {
         do {
             _ = try await makeCorrector().correct(transcript: "x", context: nil, config: CorrectionConfig(),
                                                   options: ClaudeOptions(), apiKey: "bad")
-            XCTFail("trebuia sa arunce")
+            XCTFail("should have thrown")
         } catch let error as AnthropicError {
             XCTAssertEqual(error, .http(status: 401, type: "authentication_error", message: "invalid x-api-key"))
             XCTAssertEqual(error.errorDescription, "Invalid API key (401).")
@@ -418,7 +418,7 @@ final class ClientTests: XCTestCase {
         do {
             _ = try await makeCorrector().correct(transcript: "x", context: nil, config: CorrectionConfig(),
                                                   options: ClaudeOptions(model: "claude-haiku-5-5"), apiKey: "k")
-            XCTFail("trebuia sa arunce")
+            XCTFail("should have thrown")
         } catch let error as CorrectionError {
             XCTAssertEqual(error.usage?.model, "claude-haiku-5-5")
             let expected: Double = (2000.0 * 0.10 + 40.0 * 0.50) / 1_000_000.0
@@ -430,7 +430,7 @@ final class ClientTests: XCTestCase {
     func testMissingKey() async {
         do {
             _ = try await makeCorrector().correct(transcript: "x", context: nil, config: CorrectionConfig(), options: ClaudeOptions(), apiKey: "  ")
-            XCTFail("trebuia sa arunce")
+            XCTFail("should have thrown")
         } catch {
             XCTAssertEqual(error as? AnthropicError, .missingAPIKey)
         }
@@ -482,7 +482,7 @@ final class HistoryTests: XCTestCase {
         writer.append(entry("recent", now.addingTimeInterval(-30 * day)))
         let store = HistoryStore(fileURL: url, now: { now })
         XCTAssertEqual(store.load().map(\.finalText), ["recent"])
-        // Fisierul a fost rescris fara intrarea veche.
+        // The file was rewritten without the old entry.
         XCTAssertEqual(HistoryStore(fileURL: url, now: { now }).load().count, 1)
     }
 
@@ -493,7 +493,7 @@ final class HistoryTests: XCTestCase {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted]
-        // Intrare in formatul vechi (fara campul usage).
+        // An entry in the old format (without the usage field).
         let old = HistoryEntry(date: now.addingTimeInterval(-50), appName: "Notes", rawText: "r", finalText: "vechi",
                                engine: "whisper", correctedBy: nil, audioDuration: 1, transcriptionTime: 0.2,
                                correctionTime: nil, note: nil)
@@ -559,7 +559,7 @@ final class HistoryRangeTests: XCTestCase {
             XCTAssertEqual(formatter.string(from: dates.from), from, range.title)
             XCTAssertEqual(formatter.string(from: dates.to), to, range.title)
         }
-        // 21.11.2026 e sambata; saptamana incepe luni, 16.11, oricum ar fi setat calendarul.
+        // 21.11.2026 is a Saturday; the week starts on Monday, 16.11, however the calendar is set up.
         calendar.firstWeekday = 1
         check(.today, "2026-11-21 00:00:00", "2026-11-21 23:59:59")
         check(.thisWeek, "2026-11-16 00:00:00", "2026-11-21 23:59:59")
@@ -567,7 +567,7 @@ final class HistoryRangeTests: XCTestCase {
         XCTAssertEqual(HistoryRange.all.dates(now: now, calendar: calendar).from, .distantPast)
         XCTAssertEqual(HistoryRange.all.dates(now: now, calendar: calendar).to, .distantFuture)
         XCTAssertEqual(HistoryRange.allCases.map(\.title), ["Today", "This week", "This month", "All time"])
-        // Duminica tine de saptamana inceputa luni; lunea e chiar inceputul ei.
+        // Sunday belongs to the week that started on Monday; Monday is the very start of it.
         let sunday = formatter.date(from: "2026-11-22 10:00:00")!
         XCTAssertEqual(formatter.string(from: HistoryRange.thisWeek.dates(now: sunday, calendar: calendar).from), "2026-11-16 00:00:00")
         let monday = formatter.date(from: "2026-11-23 08:00:00")!
@@ -607,7 +607,7 @@ final class PricingTests: XCTestCase {
         XCTAssertEqual(PriceList.bundled.pricing(for: "claude-opus-5-20261101")?.input, 5)
         XCTAssertEqual(ClaudeModels.displayName(for: "claude-haiku-5-5"), "Claude Haiku 5.5")
         XCTAssertEqual(ClaudeModels.displayName(for: "claude-opus-4-8"), "Claude Opus 4.8")
-        // Toate modelele din /v1/models (noiembrie 2026) au pret, inclusiv cele cu sufix de data.
+        // All the models in /v1/models (November 2026) have a price, including those with a date suffix.
         XCTAssertEqual(PriceList.bundled.pricing(for: "claude-opus-4-5-20251101")?.input, 5)
         XCTAssertEqual(PriceList.bundled.pricing(for: "claude-haiku-4-5-20251001")?.output, 5)
         XCTAssertEqual(PriceList.bundled.pricing(for: "claude-sonnet-4-5-20250929")?.output, 15)
@@ -632,16 +632,16 @@ final class PricingTests: XCTestCase {
 
 final class LogoGeometryTests: XCTestCase {
     func testShapeRegions() {
-        // Bratele din mijloc (X-ul), peretii buclelor, golurile si exteriorul.
+        // The middle arms (the X), the walls of the loops, the holes and the outside.
         XCTAssertTrue(LogoGeometry.contains(x: 1000, y: 1000))
         XCTAssertTrue(LogoGeometry.contains(x: -1000, y: -1000))
         XCTAssertTrue(LogoGeometry.contains(x: 4000, y: 0))
         XCTAssertTrue(LogoGeometry.contains(x: -4000, y: 0))
-        XCTAssertFalse(LogoGeometry.contains(x: 3000, y: 0))   // golul din dreapta
-        XCTAssertFalse(LogoGeometry.contains(x: -3000, y: 0))  // golul din stanga
-        XCTAssertFalse(LogoGeometry.contains(x: 0, y: 1000))   // deasupra centrului
-        XCTAssertFalse(LogoGeometry.contains(x: 4500, y: 0))   // in afara
-        // Capetele bratelor cad pe elipse (unghiurile parametrice sunt consistente).
+        XCTAssertFalse(LogoGeometry.contains(x: 3000, y: 0))   // the right hole
+        XCTAssertFalse(LogoGeometry.contains(x: -3000, y: 0))  // the left hole
+        XCTAssertFalse(LogoGeometry.contains(x: 0, y: 1000))   // above the center
+        XCTAssertFalse(LogoGeometry.contains(x: 4500, y: 0))   // outside
+        // The tips of the arms fall on the ellipses (the parametric angles are consistent).
         for sector in [LogoGeometry.outer, LogoGeometry.hole] {
             XCTAssertEqual(sector.rx * cos(sector.angle), sector.tipX, accuracy: 1.5)
             XCTAssertEqual(sector.ry * sin(sector.angle), sector.tipY, accuracy: 1.5)
@@ -651,7 +651,7 @@ final class LogoGeometryTests: XCTestCase {
     func testStripes() {
         let stripes = LogoGeometry.stripes(count: 19, ratio: 0.3)
         XCTAssertEqual(stripes.count, 19)
-        XCTAssertEqual(stripes[9].lowerBound + stripes[9].upperBound, 0, accuracy: 1e-9)  // liniuta din mijloc e centrata
+        XCTAssertEqual(stripes[9].lowerBound + stripes[9].upperBound, 0, accuracy: 1e-9)  // the middle stripe is centered
         let pitch = stripes[1].lowerBound - stripes[0].lowerBound
         XCTAssertEqual(pitch, LogoGeometry.width / 19, accuracy: 1e-9)
         XCTAssertEqual(stripes[0].upperBound - stripes[0].lowerBound, pitch * 0.3, accuracy: 1e-9)
@@ -661,7 +661,7 @@ final class LogoGeometryTests: XCTestCase {
     func testMenuBarPixelGrid() {
         let layout = LogoGeometry.MenuBar.self
         XCTAssertEqual(layout.width, 28.5)
-        // Pe Retina (2x): fiecare liniuta are exact 1 px si incepe pe un pixel intreg.
+        // On Retina (2x): each stripe is exactly 1 px wide and starts on a whole pixel.
         for stripe in layout.stripes {
             let x = stripe.x * 2
             XCTAssertEqual(x, x.rounded(), accuracy: 1e-6)
@@ -669,7 +669,7 @@ final class LogoGeometryTests: XCTestCase {
         }
         XCTAssertEqual(layout.stripes.first!.x, 0.5, accuracy: 1e-6)
         XCTAssertEqual(layout.stripes.last!.x + layout.stripes.last!.width, layout.width - 0.5, accuracy: 1e-6)
-        // Rombul: 17 px pe 2x, ~55% din inaltimea logo-ului, cu golul de 1 pt in jur.
+        // The rhombus: 17 px at 2x, ~57% of the logo's height, with the 1 pt gap around it.
         XCTAssertEqual(layout.rhombusHeight * 2, 17)
         let logoHeight = LogoGeometry.height * layout.scale
         XCTAssertLessThanOrEqual(logoHeight, layout.height)
@@ -680,7 +680,7 @@ final class LogoGeometryTests: XCTestCase {
     func testRhombusOutline() {
         let curves = LogoGeometry.rhombusCurves
         XCTAssertEqual(curves.count, 19)
-        // Conturul se inchide in punctul de start, iar inaltimea normalizata e 1.
+        // The outline closes at the start point, and the normalized height is 1.
         XCTAssertEqual(curves.last!.x, LogoGeometry.rhombusStart.x, accuracy: 1e-9)
         XCTAssertEqual(curves.last!.y, LogoGeometry.rhombusStart.y, accuracy: 1e-9)
         let ys = curves.map(\.y)
@@ -692,19 +692,19 @@ final class LogoGeometryTests: XCTestCase {
 
 final class BrandToneTests: XCTestCase {
     func testHSLConversion() {
-        // hsl(219, 99%, 53%) = rgb(17, 100, 254), albastrul din logo.
+        // hsl(219, 99%, 53%) = rgb(17, 100, 254), the blue from the logo.
         let blue = BrandTone.blue.rgb(onDark: true)
         XCTAssertEqual(blue.r * 255, 17, accuracy: 1)
         XCTAssertEqual(blue.g * 255, 100, accuracy: 1)
         XCTAssertEqual(blue.b * 255, 254, accuracy: 1)
-        // Pe fundal deschis: +16% luminozitate (gri ramane la fel).
+        // On a light background: +16% lightness (gray stays the same).
         let redLight = BrandTone.red.rgb(onDark: false)
         let redDark = BrandTone.red.rgb(onDark: true)
         XCTAssertGreaterThan(redLight.g, redDark.g)
         let grayLight = BrandTone.gray.rgb(onDark: false)
         let grayDark = BrandTone.gray.rgb(onDark: true)
         XCTAssertEqual(grayLight.r, grayDark.r, accuracy: 1e-12)
-        // Rosul (h = 1) ramane in primul sector de nuanta.
+        // Red (h = 1) stays in the first hue sector.
         XCTAssertGreaterThan(redDark.r, redDark.g)
         XCTAssertGreaterThan(redDark.r, redDark.b)
     }

@@ -2,7 +2,7 @@ import AVFoundation
 import AudioToolbox
 import CoreAudio
 
-// MARK: - Dispozitive de intrare (Core Audio)
+// MARK: - Input devices (Core Audio)
 
 struct AudioInputDevice: Identifiable, Hashable {
     let id: AudioDeviceID
@@ -67,11 +67,11 @@ enum AudioDevices {
     }
 }
 
-// MARK: - Inregistrare
+// MARK: - Recording
 
-/// Inregistreaza de la microfon si converteste in timp real la 16 kHz mono Float32 (formatul cerut de Whisper).
-/// Pentru fiecare inregistrare se creeaza un AVAudioEngine nou: formatul microfonului e citit proaspat,
-/// asa ca schimbarea dispozitivului (casti, AirPods) nu poate produce exceptia fatala "format mismatch".
+/// Records from the microphone and converts in real time to 16 kHz mono Float32 (the format Whisper requires).
+/// A new AVAudioEngine is created for each recording: the microphone format is read fresh,
+/// so a device change (headphones, AirPods) can't cause the fatal "format mismatch" exception.
 final class AudioRecorder: @unchecked Sendable {
     enum RecorderError: LocalizedError {
         case noInput
@@ -87,13 +87,13 @@ final class AudioRecorder: @unchecked Sendable {
 
     static let sampleRate: Double = 16_000
 
-    /// Nivelul audio (0...1), apelat pe main thread ~30 de ori pe secunda.
+    /// The audio level (0...1), called on the main thread ~30 times a second.
     var onLevel: ((Float) -> Void)?
 
     private let queue = DispatchQueue(label: "ro.cx.app.hau-di.audio", qos: .userInitiated)
     private var engine: AVAudioEngine?
     private var session: CaptureSession?
-    private let maxSamples = Int(sampleRate) * 60 * 10 // limita de siguranta: 10 minute
+    private let maxSamples = Int(sampleRate) * 60 * 10 // safety limit: 10 minutes
 
     func start(deviceUID: String?) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -108,7 +108,7 @@ final class AudioRecorder: @unchecked Sendable {
         }
     }
 
-    /// Opreste si intoarce tot audio-ul inregistrat (16 kHz mono).
+    /// Stops and returns all the recorded audio (16 kHz mono).
     func stop() async -> [Float] {
         await withCheckedContinuation { (continuation: CheckedContinuation<[Float], Never>) in
             queue.async {
@@ -131,7 +131,7 @@ final class AudioRecorder: @unchecked Sendable {
             let status = AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
                                               &id, UInt32(MemoryLayout<AudioDeviceID>.size))
             if status != noErr {
-                Log.audio.error("Nu pot selecta microfonul \(uid, privacy: .public): \(status)")
+                Log.audio.error("Can't select the microphone \(uid, privacy: .public): \(status)")
             }
         }
 
@@ -141,7 +141,7 @@ final class AudioRecorder: @unchecked Sendable {
         let session = CaptureSession(maxSamples: maxSamples) { [weak self] level in
             DispatchQueue.main.async { self?.onLevel?(level) }
         }
-        // format: nil = formatul curent al intrarii (un format explicit diferit de cel hardware arunca exceptie fatala).
+        // format: nil = current input format (an explicit format other than the hardware's throws a fatal exception).
         input.installTap(onBus: 0, bufferSize: 1024, format: nil) { buffer, _ in
             session.append(buffer)
         }
@@ -168,7 +168,7 @@ final class AudioRecorder: @unchecked Sendable {
     }
 }
 
-/// Starea unei singure inregistrari. `append` e apelat serial pe thread-ul audio al tap-ului.
+/// The state of a single recording. `append` is called serially on the tap's audio thread.
 private final class CaptureSession: @unchecked Sendable {
     private let targetFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: AudioRecorder.sampleRate,
                                              channels: 1, interleaved: false)!
@@ -191,7 +191,7 @@ private final class CaptureSession: @unchecked Sendable {
         guard buffer.frameLength > 0 else { return }
         publishLevel(buffer)
 
-        // Convertorul se (re)creeaza din formatul real al bufferelor primite.
+        // The converter is (re)created from the actual format of the incoming buffers.
         let format = buffer.format
         if converter == nil || converterInputFormat != format {
             converter = AVAudioConverter(from: format, to: targetFormat)

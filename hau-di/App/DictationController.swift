@@ -19,7 +19,7 @@ final class HistoryModel: ObservableObject {
     }
 }
 
-/// Orchestreaza fluxul: tasta apasata -> inregistrare -> transcriere locala -> corectie Claude -> inserare.
+/// Orchestrates the flow: key pressed -> recording -> local transcription -> Claude correction -> insertion.
 @MainActor
 final class DictationController: ObservableObject {
     enum RecordingState: Equatable {
@@ -31,7 +31,7 @@ final class DictationController: ObservableObject {
         case idle, transcribing, correcting, inserting
     }
 
-    /// Cat timp se inregistreaza, sistemul nu porneste screensaver-ul (vezi IdleSleepGuard).
+    /// While recording, the system doesn't start the screensaver (see IdleSleepGuard).
     @Published private(set) var recording: RecordingState = .idle {
         didSet {
             if recording == .idle { idleGuard.end() } else { idleGuard.begin() }
@@ -41,7 +41,7 @@ final class DictationController: ObservableObject {
     @Published private(set) var lastEntry: HistoryEntry?
     @Published private(set) var lastError: String?
 
-    /// Apelat cand lipseste o permisiune (deschide fereastra de setari).
+    /// Called when a permission is missing (opens the settings window).
     var onNeedsPermissions: (() -> Void)?
 
     private let settings: AppSettings
@@ -86,9 +86,9 @@ final class DictationController: ObservableObject {
         observeInterruptions()
     }
 
-    /// Ecranul blocat, screensaver-ul pornit (ex: blocare manuala), sleep sau alt utilizator: dictarea in curs nu se
-    /// pierde. Se transcrie si se corecteaza, dar textul ajunge doar in clipboard si in istoric: nu lipim nimic pe
-    /// ecranul de blocare (ar putea ajunge in campul de parola).
+    /// Screen locked, screensaver started (e.g. a manual lock), sleep or another user: the dictation in progress isn't
+    /// lost. It is transcribed and corrected, but the text goes only to the clipboard and the history: we don't paste
+    /// anything on the lock screen (it could end up in the password field).
     private func observeInterruptions() {
         let interrupt: @Sendable (Notification) -> Void = { [weak self] _ in
             MainActor.assumeIsolated { self?.interruptRecording() }
@@ -106,7 +106,7 @@ final class DictationController: ObservableObject {
 
     private func interruptRecording() {
         guard case .recording = recording else { return }
-        // Eliberarea tastelor poate sa nu mai ajunga la noi: pornim curat la urmatoarea apasare.
+        // The key release may never reach us: start clean on the next press.
         monitor.resetStateMachine()
         finishRecording(insert: false)
     }
@@ -136,7 +136,7 @@ final class DictationController: ObservableObject {
         }
     }
 
-    // MARK: - Evenimente
+    // MARK: - Events
 
     func handle(_ event: HotkeyEvent) {
         switch event {
@@ -147,7 +147,7 @@ final class DictationController: ObservableObject {
         }
     }
 
-    /// Esc: anuleaza inregistrarea sau procesarea in curs (nimic nu se insereaza).
+    /// Esc: cancels the recording or the processing in progress (nothing is inserted).
     func handleEscape() {
         if case .recording = recording {
             abortRecording(silently: false)
@@ -162,7 +162,7 @@ final class DictationController: ObservableObject {
         updateEscapeCapture()
     }
 
-    // MARK: - Inregistrare
+    // MARK: - Recording
 
     private func beginRecording(handsFree: Bool) {
         if case .recording = recording {
@@ -188,8 +188,8 @@ final class DictationController: ObservableObject {
         lastError = nil
         updateEscapeCapture()
 
-        // Aplicatia, fereastra si campul din fata, retinute la inceputul dictarii (in fundal: apeluri AX sincrone).
-        // Textul se insereaza acolo, chiar daca intre timp utilizatorul trece in alta fereastra.
+        // The front app, window and field, captured when dictation starts (in the background: synchronous AX calls).
+        // The text is inserted there, even if the user switches to another window in the meantime.
         let includeField = settings.smartSpacing || (settings.correctionEnabled && settings.sendFieldText)
         if let front = NSWorkspace.shared.frontmostApplication, front.bundleIdentifier != AppInfo.bundleID {
             let pid = front.processIdentifier
@@ -216,7 +216,7 @@ final class DictationController: ObservableObject {
             }
         }
 
-        // Pastila si sunetul apar dupa 150 ms, ca scurtaturile obisnuite (ex: fn + sageti) sa nu "clipeasca".
+        // The pill and the sound appear after 150 ms, so ordinary shortcuts (e.g. fn + arrows) don't "flicker".
         revealTask?.cancel()
         let delay: UInt64 = handsFree ? 0 : 150_000_000
         revealTask = Task { [weak self] in
@@ -244,7 +244,7 @@ final class DictationController: ObservableObject {
         }
     }
 
-    /// insert: false = textul merge doar in clipboard si in istoric (dictare intrerupta de blocarea ecranului).
+    /// insert: false = the text goes only to the clipboard and the history (dictation interrupted by a screen lock).
     private func finishRecording(insert: Bool = true) {
         guard case .recording = recording else { return }
         recording = .idle
@@ -270,27 +270,27 @@ final class DictationController: ObservableObject {
             guard let self else { return }
             await self.process(samples: samples, context: context, generation: generation, insert: insert)
             self.pendingJobs -= 1
-            // Starea ramasa de la job-ul terminat nu mai e valabila: urmeaza alt job sau repausul.
+            // The state left over from the finished job is no longer valid: next comes another job, or idle.
             self.processing = self.pendingJobs == 0 ? .idle : .transcribing
             self.settleOverlay()
             self.updateEscapeCapture()
         }
     }
 
-    // MARK: - Procesare
+    // MARK: - Processing
 
     private func process(samples: [Float], context: Task<FocusSnapshot, Never>?, generation: Int, insert: Bool) async {
         guard generation == cancelGeneration else { return }
         let audioDuration = Double(samples.count) / AudioRecorder.sampleRate
         guard audioDuration >= 0.3, AudioAnalysis.containsSpeech(samples) else {
-            // Apasare prea scurta / fara vorbire: o ignoram; pastila o aranjeaza settleOverlay() dupa job.
+            // Press too short / no speech: we ignore it; settleOverlay() tidies up the pill after the job.
             if audioDuration >= 0.8 {
                 showIfIdle(.message("Nothing heard. Check the microphone in Settings → Transcription.", isError: false), flash: 2.0)
             }
             return
         }
 
-        // 1. Transcriere locala
+        // 1. Local transcription
         processing = .transcribing
         if transcription.isReady {
             showIfIdle(.transcribing)
@@ -311,7 +311,7 @@ final class DictationController: ObservableObject {
         guard generation == cancelGeneration else { return }
 
         let cleaned = TranscriptCleaner.clean(transcript.text)
-        Log.asr.info("Transcriere in \(transcriptionTime, format: .fixed(precision: 2))s, \(cleaned.count) caractere")
+        Log.asr.info("Transcription in \(transcriptionTime, format: .fixed(precision: 2))s, \(cleaned.count) chars")
         guard !cleaned.isEmpty else {
             showIfIdle(.message("No words recognized.", isError: false), flash: 1.6)
             return
@@ -319,7 +319,7 @@ final class DictationController: ObservableObject {
 
         let snapshot = await context?.value
 
-        // 2. Corectie AI (Claude): text, date, intentie
+        // 2. AI correction (Claude): text, dates, intent
         var finalText = cleaned
         var correctedBy: String?
         var correctionTime: Double?
@@ -327,12 +327,12 @@ final class DictationController: ObservableObject {
         var correctionFailed = false
         var correctionFailureReason = ""
         var usage: CorrectionUsage?
-        /// Mesajul de buget de pe pastila: atins (fara corectie) sau avertismentul de 80%.
+        /// The budget message on the pill: reached (no correction) or the 80% warning.
         var budgetMessage: String?
 
         if settings.correctionEnabled {
             if apiKeys.hasKey, budget.status(limit: settings.monthlyBudget) == .exceeded {
-                // Bugetul lunar e atins: pana la luna urmatoare, textul se insereaza asa cum l-a transcris Whisper.
+                // The monthly budget is reached: until the next month, the text is inserted as Whisper transcribed it.
                 note = "No AI correction: the monthly budget (\(CostFormat.usd(settings.monthlyBudgetUSD))) has been reached."
                 budgetMessage = "Inserted without AI correction:\nmonthly budget reached."
             } else if apiKeys.hasKey, let key = apiKeys.apiKey {
@@ -355,37 +355,37 @@ final class DictationController: ObservableObject {
                     correctedBy = outcome.servedBy ?? options.model
                     correctionTime = outcome.duration
                     usage = outcome.usage
-                    Log.ai.info("Corectie in \(outcome.duration, format: .fixed(precision: 2))s, cost \(CostFormat.usd(outcome.usage?.costUSD ?? 0), privacy: .public)")
+                    Log.ai.info("Correction in \(outcome.duration, format: .fixed(precision: 2))s, cost \(CostFormat.usd(outcome.usage?.costUSD ?? 0), privacy: .public)")
                 } catch {
                     if let failure = error as? CorrectionError {
                         models.noteRejected(failure.rejectedFeatures, for: options.model)
                     }
-                    // Model retras intre doua reincarcari ale listei: o reincarcam, ca urmatoarea dictare
-                    // sa treaca pe cel mai nou model din aceeasi familie.
+                    // Model retired between two reloads of the list: reload it, so that the next dictation
+                    // moves to the newest model in the same family.
                     if case .http(404, _, _)? = error as? AnthropicError {
                         models.refresh(apiKey: key)
                     }
                     guard generation == cancelGeneration else { return }
-                    // Si cand rezultatul e respins, requestul a fost platit: pastram costul in istoric.
+                    // Even when the result is rejected, the request was paid for: keep the cost in the history.
                     usage = (error as? CorrectionError)?.usage
                     note = "AI correction failed: \(error.localizedDescription)"
                     correctionFailureReason = error.localizedDescription
                     correctionFailed = true
                     Log.ai.error("\(error.localizedDescription, privacy: .public)")
                 }
-                // Se numara si corecturile respinse: au fost platite.
+                // Rejected corrections count too: they were paid for.
                 if budget.add(usage?.costUSD, limit: settings.monthlyBudget) {
                     budgetMessage = budgetWarning()
                 }
                 models.refreshIfStale(apiKey: key)
             } else {
-                // Fara cheie: inseram textul brut fara sa tratam asta ca eroare (meniul arata indicatia).
+                // No key: insert the raw text without treating this as an error (the menu shows the hint).
                 note = "No AI correction: the API key is missing."
             }
         }
         guard generation == cancelGeneration else { return }
         if !settings.useDiacritics, settings.language.diacriticLetters != nil {
-            // Fara Claude e singura sursa; cu Claude e plasa de siguranta pentru diacriticele scapate.
+            // Without Claude this is the only pass; with Claude it's the safety net for diacritics that slip through.
             finalText = Diacritics.strip(finalText, language: settings.language)
         }
         guard !finalText.isEmpty else {
@@ -393,7 +393,7 @@ final class DictationController: ObservableObject {
             return
         }
 
-        // 3. Inserare in campul activ
+        // 3. Insertion into the active field
         if settings.smartSpacing {
             finalText = SmartSpacing.adjust(finalText, precedingText: snapshot?.textBeforeCursor)
         }
@@ -431,7 +431,7 @@ final class DictationController: ObservableObject {
         lastEntry = entry
         if settings.historyEnabled { history.add(entry) }
 
-        // Eroarea de inserare a afisat-o deja fail(); textul ramane in istoric si in clipboard.
+        // fail() has already shown the insertion error; the text stays in the history and in the clipboard.
         if insertionFailed { return }
         if !insert {
             lastError = Self.interruptedNote
@@ -449,7 +449,7 @@ final class DictationController: ObservableObject {
         }
     }
 
-    /// "Ai folosit 82% din bugetul lunar: $16.40 din $20.00."
+    /// "You've used 82% of your monthly budget: $16.40 of $20.00."
     private func budgetWarning() -> String {
         let limit = settings.monthlyBudgetUSD
         let spent = budget.spentThisMonth
@@ -457,13 +457,13 @@ final class DictationController: ObservableObject {
         return "You've used \(percent)% of your monthly budget:\n\(CostFormat.usd(spent)) of \(CostFormat.usd(limit))."
     }
 
-    // MARK: - Utilitare
+    // MARK: - Utilities
 
     private func updateEscapeCapture() {
         monitor.setEscapeCapture(recording != .idle || pendingJobs > 0)
     }
 
-    /// Nu acoperim pastila de inregistrare daca utilizatorul a inceput deja o dictare noua.
+    /// We don't cover the recording pill if the user has already started a new dictation.
     private func showIfIdle(_ mode: OverlayMode, flash: TimeInterval? = nil) {
         guard recording == .idle else { return }
         if let flash {
@@ -473,7 +473,7 @@ final class DictationController: ObservableObject {
         }
     }
 
-    /// Dupa o inregistrare anulata: arata ce se proceseaza acum sau, daca nu e nimic, scoate pastila.
+    /// After a canceled recording: shows what is being processed now or, if nothing is, removes the pill.
     private func restoreOverlayForProcessing() {
         guard recording == .idle else { return }
         switch processing {
@@ -483,16 +483,17 @@ final class DictationController: ObservableObject {
         }
     }
 
-    /// Dupa fiecare job: daca nu mai e nimic de procesat, pastila nu ramane agatata pe „Transcriu…” sau
-    /// „Corectez…”. Mesajele cu temporizator (Inserat, erori) se inchid singure, la timpul lor.
+    /// After each job: if nothing is left to process, the pill doesn't stay stuck on "Transcribing…" or
+    /// "Correcting with Claude…". Timed messages (Inserted, errors) close on their own, when their time is up.
     private func settleOverlay() {
         guard recording == .idle, pendingJobs == 0 else { return }
         overlay.hideIfPersistent()
     }
 
-    /// Cat ramane pe ecran un mesaj de eroare (corectia Claude, microfon, transcriere, inserare), ca sa poata fi citit.
+    /// How long an error message (Claude correction, microphone, transcription, insertion) stays on screen,
+    /// so it can be read.
     private static let errorMessageDuration: TimeInterval = 6
-    /// Dictare oprita de blocarea ecranului sau de sleep: textul e in clipboard si in istoric, nu s-a lipit nicaieri.
+    /// Dictation stopped by a screen lock or sleep: the text is in the clipboard and the history, not pasted anywhere.
     private static let interruptedNote = "The screen locked during dictation: the text is in the clipboard and in History."
 
     private func fail(_ message: String) {

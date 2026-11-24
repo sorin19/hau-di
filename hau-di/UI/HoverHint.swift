@@ -1,15 +1,15 @@
 import AppKit
 import SwiftUI
 
-/// Tooltip propriu: un balon mic deasupra elementului, dupa 0,3 s de hover. Tooltip-ul nativ (`.help`) apare abia
-/// dupa cateva secunde si arata ca title-ul din browser; in panoul din bara de meniu folosim balonul acesta.
-/// Balonul iese in sus, peste elementele de deasupra (desenate inaintea lui), deci nu are nevoie de zIndex.
-/// Fond opac, fara material si fara umbra: un material in panoul de sticla din macOS 26 facea sticla intregului
-/// panou sa se redeseneze (devenea transparenta, cu reflexiile barii de meniu).
+/// Custom tooltip: a small bubble above the element, after 0.3 s of hover. The native tooltip (`.help`) only shows up
+/// after a few seconds and looks like a browser title; in the menu bar panel we use this bubble instead.
+/// The bubble sticks out upward, over the elements above (drawn before it), so it does not need a zIndex.
+/// Opaque background, no material and no shadow: a material inside the macOS 26 glass panel made the glass of the
+/// whole panel redraw (it turned transparent, with the reflections of the menu bar).
 struct HoverHint: ViewModifier {
     let text: String
-    /// Unde se aliniaza balonul fata de element: .leading pentru elementele din stanga, .trailing pentru cele din
-    /// dreapta (ca sa nu iasa din fereastra), .center in rest.
+    /// How the bubble is aligned to the element: .leading for elements on the left, .trailing for those on the
+    /// right (so that it does not stick out of the window), .center otherwise.
     var alignment: HorizontalAlignment = .center
     @State private var visible = false
     @State private var pending: Task<Void, Never>?
@@ -33,9 +33,9 @@ struct HoverHint: ViewModifier {
                             RoundedRectangle(cornerRadius: 6, style: .continuous)
                                 .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
                         )
-                        // Un cadru de inaltime zero lipit de marginea de sus a elementului, cu balonul aliniat jos:
-                        // balonul creste in sus, deasupra elementului, oricat de inalt ar fi (fara alignmentGuide,
-                        // care pe Mac nu se aplica aici si lasa balonul peste rand).
+                        // A zero-height frame pinned to the element's top edge, with the bubble aligned to its bottom:
+                        // the bubble grows upward, above the element, however tall it is (no alignmentGuide,
+                        // which on the Mac is not applied here and leaves the bubble over the row).
                         .frame(height: 0, alignment: .bottom)
                         .offset(y: -4)
                         .allowsHitTesting(false)
@@ -59,7 +59,7 @@ struct HoverHint: ViewModifier {
 }
 
 extension View {
-    /// Balon de ajutor la hover (vezi HoverHint).
+    /// Help bubble on hover (see HoverHint).
     func hoverHint(_ text: String, alignment: HorizontalAlignment = .center) -> some View {
         modifier(HoverHint(text: text, alignment: alignment))
     }

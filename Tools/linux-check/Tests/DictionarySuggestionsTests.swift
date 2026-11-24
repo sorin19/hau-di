@@ -26,7 +26,7 @@ final class DictionarySuggestionsTests: XCTestCase {
 
     func testRomanianSuffixIsStripped() {
         XCTAssertEqual(terms([entry("jussonul e gata", "JSON-ul e gata.")]), ["JSON"])
-        // Aceleasi litere, doar majuscule si cratima: Claude o repara oricum, nu e nimic de invatat.
+        // Same letters, only capitals and the hyphen differ: Claude fixes that anyway, there is nothing to learn.
         XCTAssertEqual(terms([entry("jsonul e gata", "JSON-ul e gata.")]), [])
         XCTAssertEqual(terms([entry("cu bordă-ul ăla", "cu border-ul ăla")]), ["border"])
         XCTAssertEqual(DictionarySuggestions.baseTerm("commit-urile").term, "commit")
@@ -36,7 +36,7 @@ final class DictionarySuggestionsTests: XCTestCase {
     func testGrammarFixesAreNotSuggested() {
         XCTAssertEqual(terms([entry("știu că eu ținem aici să facem așa", "Știu că eu ți-am zis să faci așa.")]), [])
         XCTAssertEqual(terms([entry("in diccionar am pus", "În Dicționar am pus")]), [])
-        // Doar majuscule, diacritice sau punctuatie diferite: nimic de invatat.
+        // Only capitals, diacritics or punctuation differ: nothing to learn.
         XCTAssertEqual(terms([entry("deci github e ok", "Deci GitHub e OK.")]), [])
     }
 
@@ -66,7 +66,7 @@ final class DictionarySuggestionsTests: XCTestCase {
             entry("pentru howdy acum", "pentru hau-di acum", date: new),
             entry("la clod", "la clod", corrected: false),
         ]
-        XCTAssertEqual(terms(entries), ["hau-di"], "forma cea mai noua, nu cea mai deasa")
+        XCTAssertEqual(terms(entries), ["hau-di"], "the newest form, not the most frequent one")
         XCTAssertEqual(terms(entries, ignoring: ["haudi"]), [])
     }
 
@@ -81,7 +81,7 @@ final class DictionarySuggestionsTests: XCTestCase {
     func testReplacementBlocks() {
         let blocks = DictionarySuggestions.replacements(heard: ["a", "b", "x", "d", "y", "z"], written: ["a", "b", "c", "d"])
         XCTAssertEqual(blocks.map { [$0.heard.lowerBound, $0.heard.upperBound, $0.written.lowerBound, $0.written.upperBound] },
-                       [[2, 3, 2, 3]], "doar inlocuirile cu ambele parti nevide")
+                       [[2, 3, 2, 3]], "only the replacements with both sides non-empty")
         XCTAssertEqual(DictionarySuggestions.key("JSON-ul,"), "jsonul")
         XCTAssertEqual(DictionarySuggestions.key("Ștefănescu"), "stefanescu")
     }

@@ -1,15 +1,15 @@
 import Foundation
 
-/// Mutarea datelor de pe bundle ID-urile vechi (AppInfo.legacyBundleIDs) pe cel curent, o singura data.
-/// Modelele si istoricul nu depind de bundle ID (sunt in ~/Library/Application Support/hau-di; folderul vechi
-/// „Haudi” il muta AppPaths.applicationSupport).
+/// Moves the data from the old bundle IDs (AppInfo.legacyBundleIDs) to the current one, once.
+/// Models and history do not depend on the bundle ID (they live in ~/Library/Application Support/hau-di; the old
+/// "Haudi" folder is moved by AppPaths.applicationSupport).
 enum LegacyMigration {
     private static let defaultsMigratedKey = "legacyDefaultsMigrated"
-    /// Indicatorii migrarilor anterioare nu se copiaza: pe ID-ul nou, fiecare migrare trebuie sa ruleze o data
-    /// (altfel, de exemplu, cheia API din Keychain n-ar mai fi mutata).
+    /// The flags of earlier migrations are not copied: on the new ID, every migration must run once
+    /// (otherwise, for example, the API key in the Keychain would never be moved).
     private static let internalKeys: Set<String> = [defaultsMigratedKey, "legacyKeychainMigrationAttempted"]
 
-    /// Copiaza setarile vechi (doar cheile care lipsesc in domeniul curent), apoi sterge domeniul vechi.
+    /// Copies the old settings (only the keys missing from the current domain), then deletes the old domain.
     static func migrateDefaults(into defaults: UserDefaults) {
         guard !defaults.bool(forKey: defaultsMigratedKey) else { return }
         for legacyID in AppInfo.legacyBundleIDs where legacyID != AppInfo.bundleID {
@@ -22,7 +22,7 @@ enum LegacyMigration {
         defaults.set(true, forKey: defaultsMigratedKey)
     }
 
-    /// Sterge cache-urile ramase de pe ID-ul vechi (se regenereaza oricum, ex: compilarea Core ML).
+    /// Deletes the caches left over from the old IDs (they are regenerated anyway, e.g. the Core ML compilation).
     static func removeLegacyCaches() {
         guard let library = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first else { return }
         for legacyID in AppInfo.legacyBundleIDs where legacyID != AppInfo.bundleID {

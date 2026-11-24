@@ -1,6 +1,6 @@
 // swift-tools-version: 5.10
-// Harness pentru verificari pe Linux: compileaza si testeaza codul portabil din hau-di/Core.
-// Rulare: Tools/linux-check/run.sh (copiaza sursele intr-un director temporar).
+// Harness for checks on Linux: builds and tests the portable code in hau-di/Core.
+// Run with: Tools/linux-check/run.sh (it copies the sources into a temporary directory).
 import PackageDescription
 
 let package = Package(

@@ -1,13 +1,13 @@
 import AppKit
 import SwiftUI
 
-/// Butonul de copiere (panoul din bara de meniu, istoric): iconul fara chenar, cu fundal la hover;
-/// dupa click devine o bifa pentru o secunda, ca sa se vada ca s-a copiat.
+/// The copy button (menu bar panel, history): the icon without a border, with a background on hover;
+/// after a click it turns into a checkmark for a second, to show that the text was copied.
 struct CopyIconButton: View {
     let text: String
     @State private var copied = false
 
-    // Explicit: cu o proprietate @State privata, initializatorul generat nu se vede din alte fisiere.
+    // Explicit: with a private @State property, the synthesized initializer is not visible from other files.
     init(text: String) {
         self.text = text
     }
@@ -31,8 +31,8 @@ struct CopyIconButton: View {
     }
 }
 
-/// Stilul butoanelor mici cu icon (copiere, stergere): fara chenar, cu un fundal discret la hover si la apasare.
-/// `destructive` coloreaza iconul in rosu la hover (stergere).
+/// The style of the small icon buttons (copy, delete): no border, with a subtle background on hover and on press.
+/// `destructive` colors the icon red on hover (delete).
 struct HoverIconButtonStyle: ButtonStyle {
     var destructive = false
 

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Ce a auzit Whisper la ultima dictare: fiecare cuvant cu probabilitatea lui (cat de sigur a fost modelul).
-/// Doar pentru diagnostic: probabilitatile nu se trimit lui Claude (testul A/B din 24.11.2026 n-a aratat un castig).
+/// What Whisper heard in the last dictation: each word with its probability (how confident the model was).
+/// For diagnostics only: the probabilities are not sent to Claude (the A/B test of 2026-11-24 showed no gain).
 struct WhisperWordsView: View {
     let entry: HistoryEntry?
 
@@ -67,7 +67,7 @@ struct WhisperWordsView: View {
     }
 }
 
-/// Un cuvant cu procentul sub el; fundal rosu sub 50%, portocaliu sub 80%.
+/// A word with its percentage below it; red background under 50%, orange under 80%.
 private struct WordChip: View {
     let word: TranscribedWord
 

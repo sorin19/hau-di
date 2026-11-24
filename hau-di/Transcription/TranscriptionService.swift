@@ -21,18 +21,18 @@ enum SpeechEngineError: LocalizedError {
     }
 }
 
-/// Un motor de speech-to-text local (WhisperKit).
+/// A local speech-to-text engine (WhisperKit).
 protocol SpeechEngine: AnyObject, Sendable {
-    /// Descarca (daca e nevoie) si incarca modelul.
+    /// Downloads (if needed) and loads the model.
     func prepare(progress: @escaping @Sendable (ModelLoadProgress) -> Void) async throws
-    /// Audio 16 kHz mono Float32 -> text, plus cuvintele lui cu probabilitatea fiecaruia.
+    /// 16 kHz mono Float32 audio -> text, plus its words with the probability of each.
     func transcribe(_ samples: [Float], language: DictationLanguage, vocabulary: [String]) async throws -> SpeechTranscript
-    /// Cati termeni din dictionar ajung la model ca indiciu; nil daca modelul nu e incarcat.
+    /// How many dictionary terms reach the model as a hint; nil if the model isn't loaded.
     func vocabularyReach(_ vocabulary: [String]) async -> Int?
     func unload() async
 }
 
-/// Gestioneaza ciclul de viata al motorului de transcriere activ.
+/// Manages the lifecycle of the active transcription engine.
 @MainActor
 final class TranscriptionService: ObservableObject {
     enum State: Equatable {
@@ -47,7 +47,7 @@ final class TranscriptionService: ObservableObject {
         var whisperModel: String
         var language: DictationLanguage
 
-        /// Modelul nu depinde de limba (ea se da la fiecare transcriere), deci schimbarea limbii nu il reincarca.
+        /// The model doesn't depend on the language (given per transcription), so a language change doesn't reload it.
         var identity: String {
             "whisper|\(whisperModel)"
         }
@@ -68,7 +68,7 @@ final class TranscriptionService: ObservableObject {
 
     var isReady: Bool { state == .ready }
 
-    /// Descarca sau pregateste modelul chiar acum.
+    /// Downloading or preparing the model right now.
     var isBusy: Bool {
         switch state {
         case .downloading, .preparing: return true
@@ -124,13 +124,13 @@ final class TranscriptionService: ObservableObject {
                 self.pendingIdentity = nil
                 self.state = .ready
                 self.loadTask = nil
-                Log.asr.info("Model gata: \(configuration.identity, privacy: .public)")
+                Log.asr.info("Model ready: \(configuration.identity, privacy: .public)")
             } catch {
                 guard let self, self.loadGeneration == generation else { return }
                 self.pendingIdentity = nil
                 self.loadTask = nil
                 self.state = .failed(error.localizedDescription)
-                Log.asr.error("Incarcarea modelului a esuat: \(error.localizedDescription, privacy: .public)")
+                Log.asr.error("Loading the model failed: \(error.localizedDescription, privacy: .public)")
             }
         }
     }
@@ -147,7 +147,7 @@ final class TranscriptionService: ObservableObject {
         }
     }
 
-    /// Asteapta modelul daca se incarca, apoi transcrie.
+    /// Waits for the model if it is loading, then transcribes.
     func transcribe(_ samples: [Float], language: DictationLanguage, vocabulary: [String]) async throws -> SpeechTranscript {
         if engine == nil, let loadTask {
             if case .downloading(let fraction) = state {
@@ -162,7 +162,7 @@ final class TranscriptionService: ObservableObject {
         return try await engine.transcribe(samples, language: language, vocabulary: vocabulary)
     }
 
-    /// Cati termeni din dictionar (de la inceputul listei) ajung la Whisper; nil cat timp modelul nu e incarcat.
+    /// How many dictionary terms (from the start of the list) reach Whisper; nil while the model isn't loaded.
     func vocabularyReach(_ vocabulary: [String]) async -> Int? {
         guard let engine else { return nil }
         return await engine.vocabularyReach(vocabulary)

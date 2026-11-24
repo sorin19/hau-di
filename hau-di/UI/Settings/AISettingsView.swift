@@ -178,9 +178,9 @@ struct AISettingsView: View {
         .onAppear { models.refreshIfStale(apiKey: apiKeys.apiKey) }
     }
 
-    // MARK: - Modelul
+    // MARK: - Model
 
-    /// Modelul folosit efectiv pentru selectia curenta.
+    /// The model actually used for the current selection.
     private var currentModelID: String { models.resolvedID(for: settings.claudeModel) }
     private var currentInfo: ClaudeModelInfo? { models.info(for: currentModelID) }
 
@@ -196,7 +196,7 @@ struct AISettingsView: View {
                     }
                 }
             }
-            // Selectia curenta trebuie sa fie printre optiuni: lista inca neincarcata sau model scos din API.
+            // The current selection must be among the options: list not loaded yet, or model removed from the API.
             if !selectionListed {
                 Text(ClaudeModels.selectionTitle(settings.claudeModel)).tag(settings.claudeModel)
             }
@@ -210,7 +210,7 @@ struct AISettingsView: View {
         }
     }
 
-    /// "Claude Opus 5.5 · $4 / $20", plus data retragerii pentru modelele depreciate.
+    /// "Claude Opus 5.5 · $4 / $20", plus the retirement date for deprecated models.
     private func modelTitle(_ model: ClaudeModelInfo) -> String {
         var title = model.displayName
         if let price = models.prices.label(for: model.id) { title += " · " + price }
@@ -218,7 +218,7 @@ struct AISettingsView: View {
         return title
     }
 
-    /// ID-ul, pretul de lista (cu link catre lista de preturi) si, daca e cazul, inlocuirea sau retragerea modelului.
+    /// The ID, the list price (linked to the price list) and, where relevant, the model's replacement or retirement.
     private var modelDetail: AttributedString {
         let id = currentModelID
         var text = AttributedString()
@@ -247,7 +247,7 @@ struct AISettingsView: View {
     private var catalogStatus: String {
         var parts: [String] = []
         if let error = models.lastError {
-            // Mesajele de eroare se termina de obicei cu punct: nu-l dublam.
+            // Error messages usually end with a period: do not double it.
             parts.append("The model list could not be loaded: " + (error.hasSuffix(".") ? error : error + "."))
         } else if let fetchedAt = models.fetchedAt, !models.models.isEmpty {
             let shown = models.available.count, total = models.models.count
@@ -283,19 +283,19 @@ struct AISettingsView: View {
     }
 
     private static func shortDate(_ date: Date) -> String {
-        // ISO, ca restul datelor din aplicatie (2026-11-24 15:30): fara ambiguitate zi/luna.
+        // ISO, like the other dates in the app (2026-11-24 15:30): no day/month ambiguity.
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
         return formatter.string(from: date)
     }
 
-    /// Nivelurile de efort ale modelului (din API); toate, daca lista nu e inca incarcata.
+    /// The model's effort levels (from the API); all of them if the list is not loaded yet.
     private var availableEfforts: [EffortLevel] {
         currentInfo?.efforts ?? EffortLevel.allCases
     }
 
-    /// Arata nivelul trimis efectiv (cel ales sau cel mai apropiat mai mic pe care il are modelul).
+    /// Shows the level actually sent (the chosen one, or the nearest lower one the model supports).
     private var effortBinding: Binding<EffortLevel> {
         Binding(get: { ModelCatalog.effort(settings.effort, for: currentInfo) ?? settings.effort },
                 set: { settings.effort = $0 })

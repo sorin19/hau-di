@@ -3,10 +3,10 @@ import Foundation
 import FoundationNetworking
 #endif
 
-// Client minimal pentru Claude Messages API (HTTP direct: Swift nu are SDK oficial Anthropic).
-// Documentatie: https://platform.claude.com/docs/en/api/messages
+// Minimal client for the Claude Messages API (direct HTTP: there is no official Anthropic SDK for Swift).
+// Documentation: https://platform.claude.com/docs/en/api/messages
 
-/// Valoare JSON arbitrara (pentru schema structured outputs).
+/// An arbitrary JSON value (for the structured outputs schema).
 public indirect enum JSONValue: Codable, Equatable, Sendable {
     case string(String)
     case number(Double)
@@ -129,9 +129,9 @@ public struct MessagesRequest: Encodable, Sendable {
     public var system: [SystemBlock]
     public var messages: [Message]
     public var outputConfig: OutputConfig?
-    /// Fallback server-side la refuz: "default" (necesita beta server-side-fallback-2026-07-01).
+    /// Server-side fallback on refusal: "default" (requires the server-side-fallback-2026-07-01 beta).
     public var fallbacks: String?
-    /// "fast" = fast mode (doar Opus 5.5).
+    /// "fast" = fast mode (Opus 5.5 only).
     public var speed: String?
 
     public init(model: String, maxTokens: Int, system: [SystemBlock], messages: [Message],
@@ -190,7 +190,7 @@ public struct MessagesResponse: Decodable, Sendable {
         case usage
     }
 
-    /// Textul raspunsului: doar blocurile `text` (raspunsul poate contine si `thinking` / `fallback`).
+    /// The response text: only the `text` blocks (the response may also contain `thinking` / `fallback`).
     public var text: String {
         content.filter { $0.type == "text" }.compactMap(\.text).joined()
     }
@@ -252,7 +252,7 @@ public enum AnthropicError: Error, LocalizedError, Equatable {
 }
 
 public final class AnthropicClient: @unchecked Sendable {
-    /// Versiunea de API trimisa in header-ul `anthropic-version`.
+    /// The API version sent in the `anthropic-version` header.
     public static let apiVersion = "2026-10-21"
     public static let serverSideFallbackBeta = "server-side-fallback-2026-07-01"
 
@@ -295,7 +295,7 @@ public final class AnthropicClient: @unchecked Sendable {
         }
     }
 
-    /// GET /v1/models: toate modelele la care are acces cheia (cu paginare), cu capabilitatile lor.
+    /// GET /v1/models: every model the key has access to (paginated), with their capabilities.
     public func listModels(apiKey: String, timeout: TimeInterval = 15) async throws -> [ClaudeModelInfo] {
         var models: [ClaudeModelInfo] = []
         var after: String?
@@ -320,7 +320,7 @@ public final class AnthropicClient: @unchecked Sendable {
         return models
     }
 
-    /// GET /v1/models?limit=1 - valideaza cheia fara costuri.
+    /// GET /v1/models?limit=1 - validates the key at no cost.
     public func validateKey(_ apiKey: String, timeout: TimeInterval = 15) async throws {
         var components = URLComponents(url: baseURL.appendingPathComponent("v1/models"), resolvingAgainstBaseURL: false)!
         components.queryItems = [URLQueryItem(name: "limit", value: "1")]

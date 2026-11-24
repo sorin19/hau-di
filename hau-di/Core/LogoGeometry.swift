@@ -1,18 +1,18 @@
 import Foundation
 
-/// Geometria logo-ului (datele formei sunt in BrandMark.swift, exclus din GPL), centrata in origine, cu y in jos.
-/// Doua bucle simetrice; fiecare e un sector de elipsa (peretele) din care se scade un sector mai mic (golul).
-/// Iconul din bara, unda din pastila si iconul aplicatiei o deseneaza din liniute verticale.
+/// The logo geometry (shape data in BrandMark.swift, excluded from the GPL), centered on the origin, y pointing down.
+/// Two symmetric loops; each is an ellipse sector (the wall) from which a smaller sector (the hole) is subtracted.
+/// The menu bar icon, the waveform in the pill and the app icon draw it with vertical stripes.
 public enum LogoGeometry {
-    /// Sectorul din dreapta: din centru pana la elipsa, intre bratele y = ±x·tipY/tipX. Stanga e oglindit.
+    /// The right sector: from the center to the ellipse, between the arms y = ±x·tipY/tipX. The left one is mirrored.
     public struct Sector: Sendable {
         public let rx: Double
         public let ry: Double
-        /// Capatul bratului, unde linia din centru intalneste elipsa.
+        /// The tip of the arm, where the line from the center meets the ellipse.
         public let tipX: Double
         public let tipY: Double
 
-        /// Unghiul parametric al capatului bratului pe elipsa (x = rx·cos t, y = ry·sin t).
+        /// The parametric angle of the arm tip on the ellipse (x = rx·cos t, y = ry·sin t).
         public var angle: Double { atan2(tipY / ry, tipX / rx) }
 
         func contains(x: Double, y: Double) -> Bool {
@@ -33,14 +33,14 @@ public enum LogoGeometry {
     public static var width: Double { 2 * halfWidth }
     public static var height: Double { 2 * halfHeight }
 
-    /// Punctul e in forma plina (perete), nu in gol si nu in afara.
+    /// The point is in the solid shape (the wall), not in the hole and not outside.
     public static func contains(x: Double, y: Double) -> Bool {
         let ax = abs(x)
         return outer.contains(x: ax, y: y) && !hole.contains(x: ax, y: y)
     }
 
-    /// Liniutele verticale, de la stanga la dreapta: intervale [x0, x1] in unitatile logo-ului.
-    /// `ratio` = latimea liniutei din pas (0,3 = 30%).
+    /// The vertical stripes, from left to right: [x0, x1] intervals in logo units.
+    /// `ratio` = the stripe width as a fraction of the pitch (0.3 = 30%).
     public static func stripes(count: Int, ratio: Double) -> [ClosedRange<Double>] {
         guard count > 0 else { return [] }
         let pitch = width / Double(count)
@@ -51,37 +51,37 @@ public enum LogoGeometry {
         }
     }
 
-    // MARK: - Rombul din „cx.ro”
+    // MARK: - The rhombus in "cx.ro"
 
-    /// Latime / inaltime.
+    /// Width / height.
     public static let rhombusAspect = BrandMark.rhombusAspect
-    /// Conturul rombului normalizat: centrat in origine, inaltime 1, y in jos; curbe patratice.
+    /// The normalized rhombus outline: centered on the origin, height 1, y pointing down; quadratic curves.
     public static let rhombusStart = BrandMark.rhombusStart
     public static let rhombusCurves = BrandMark.rhombusCurves
 
-    // MARK: - Iconul din bara de meniu
+    // MARK: - The menu bar icon
 
-    /// Aliniat la pixelii de pe Retina (2x): liniute de 1 px la pas de 3 px, rombul de 17 px.
+    /// Aligned to Retina (2x) pixels: 1 px stripes at a 3 px pitch, a 17 px rhombus.
     public enum MenuBar {
         public static let stripeCount = 19
-        /// 1 px liniuta din 3 px pas.
+        /// 1 px of stripe per 3 px of pitch.
         public static let stripeRatio = 1.0 / 3.0
-        /// Pasul liniutelor, in puncte (3 px pe 2x).
+        /// The stripe pitch, in points (3 px at 2x).
         public static let pitch = 1.5
         public static var width: Double { Double(stripeCount) * pitch }
         public static let height = 15.0
-        /// Rombul colorat: 8,5 pt = 17 px pe 2x (~55% din inaltimea logo-ului).
+        /// The colored rhombus: 8.5 pt = 17 px at 2x (~55% of the logo height).
         public static let rhombusHeight = 8.5
-        /// Spatiul gol din jurul rombului; ramane constant, nu creste odata cu rombul.
+        /// The empty space around the rhombus; it stays constant and does not grow with the rhombus.
         public static let gap = 1.0
 
-        /// Puncte per unitate de logo.
+        /// Points per logo unit.
         public static var scale: Double { width / LogoGeometry.width }
         public static var center: (x: Double, y: Double) { (width / 2, height / 2) }
-        /// Cat se mareste rombul ca sa decupeze golul din liniute (gol perpendicular pe laturi = `gap`).
+        /// How much the rhombus grows to cut the gap out of the stripes (gap perpendicular to the sides = `gap`).
         public static var haloScale: Double { 1 + gap * 2.0.squareRoot() / (rhombusHeight / 2) }
 
-        /// Liniutele in puncte: (x, latime), de la stanga la dreapta.
+        /// The stripes in points: (x, width), from left to right.
         public static var stripes: [(x: Double, width: Double)] {
             LogoGeometry.stripes(count: stripeCount, ratio: stripeRatio).map { range in
                 (x: center.x + range.lowerBound * scale, width: (range.upperBound - range.lowerBound) * scale)
@@ -90,7 +90,7 @@ public enum LogoGeometry {
     }
 }
 
-/// Culorile din cx-ro-logo.svg (HSL). Pe fundal deschis, logo-ul foloseste aceeasi nuanta cu +16% luminozitate.
+/// The colors from cx-ro-logo.svg (HSL). On a light background, the logo uses the same hue with +16% lightness.
 public enum BrandTone: String, CaseIterable, Sendable {
     case blue, purple, red, orange, yellow, green, gray
 
@@ -106,7 +106,7 @@ public enum BrandTone: String, CaseIterable, Sendable {
         }
     }
 
-    /// Luminozitatea adaugata pe fundal deschis (gri ramane la fel).
+    /// The lightness added on a light background (gray stays the same).
     public var lightBoost: Double { self == .gray ? 0 : 0.16 }
 
     /// sRGB 0...1.

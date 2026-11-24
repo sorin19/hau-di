@@ -35,12 +35,12 @@ final class BudgetTests: XCTestCase {
         let second = first.spend.adding(0.6, limit: 20, at: now, calendar: calendar)
         XCTAssertTrue(second.crossedWarning)
         XCTAssertEqual(second.spend.spentUSD, 16.1, accuracy: 1e-9)
-        // Avertismentul apare o singura data pe luna, chiar si cand se trece de 100%.
+        // The warning appears only once a month, even when spending goes past 100%.
         let third = second.spend.adding(10, limit: 20, at: now, calendar: calendar)
         XCTAssertFalse(third.crossedWarning)
         XCTAssertEqual(BudgetStatus.of(spent: third.spend.spentUSD, limit: 20), .exceeded)
 
-        // Luna noua (1 decembrie, 00:05 la Bucuresti): de la zero, cu avertismentul din nou posibil.
+        // New month (December 1, 00:05 in Bucharest): back to zero, with the warning possible again.
         let december = date("2026-12-01 00:05")
         let reset = third.spend.current(at: december, calendar: calendar)
         XCTAssertEqual(reset, MonthlySpend(month: "2026-12"))

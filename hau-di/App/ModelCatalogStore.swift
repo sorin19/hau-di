@@ -1,10 +1,10 @@
 import Foundation
 import Combine
 
-/// Modelele Claude din setari: cele la care are acces cheia (GET /v1/models, reincarcata zilnic) si care au pret
-/// in lista de preturi (de pe pay.cx.ro/hau-di/pricing/, citita saptamanal). Ambele se pastreaza pe disc, ca sa fie
-/// disponibile imediat la pornire si fara retea. Se reincarca si la schimbarea cheii, la deschiderea setarilor AI,
-/// dupa corecturi si cand API-ul spune ca modelul nu mai exista (404).
+/// The Claude models in the settings: those the key has access to (GET /v1/models, reloaded daily) and that have a
+/// price in the price list (from pay.cx.ro/hau-di/pricing/, fetched weekly). Both are kept on disk, so they are
+/// available right away at launch and without a network. Also reloaded when the key changes, when the AI settings
+/// open, after corrections and when the API says the model no longer exists (404).
 @MainActor
 final class ModelCatalogStore: ObservableObject {
     // GET /v1/models
@@ -12,17 +12,17 @@ final class ModelCatalogStore: ObservableObject {
     @Published private(set) var fetchedAt: Date?
     @Published private(set) var isLoading = false
     @Published private(set) var lastError: String?
-    // Lista de preturi (pay.cx.ro/hau-di/pricing/)
+    // Price list (pay.cx.ro/hau-di/pricing/)
     @Published private(set) var prices: PriceList = .bundled
-    /// nil = se foloseste copia inclusa in aplicatie.
+    /// nil = the copy bundled with the app is used.
     @Published private(set) var pricesFetchedAt: Date?
     @Published private(set) var pricesError: String?
-    /// Parametrii refuzati de API (400), pe model (ID fara data): "speed" (fast mode), "fallbacks".
+    /// Parameters rejected by the API (400), per model (ID without the date): "speed" (fast mode), "fallbacks".
     @Published private(set) var rejected: [String: Set<String>] = [:]
 
     private static let modelsMaxAge: TimeInterval = 24 * 3600
     private static let pricesMaxAge: TimeInterval = 7 * 24 * 3600
-    /// Dupa o eroare (fara retea, server cazut) nu reincercam la fiecare dictare.
+    /// After an error (no network, server down) we don't retry on every dictation.
     private static let retryAfterError: TimeInterval = 3600
 
     private let fileURL: URL
@@ -57,7 +57,7 @@ final class ModelCatalogStore: ObservableObject {
             models = cache.models
             fetchedAt = cache.fetchedAt
             rejected = cache.rejected
-            // Lista descarcata ramane, daca nu e mai veche decat copia din aplicatie (dupa o actualizare).
+            // The downloaded list stays, unless it is older than the copy in the app (after an update).
             if let cached = cache.prices, cached.stamp >= PriceList.bundled.stamp {
                 prices = cached
                 pricesFetchedAt = cache.pricesFetchedAt
@@ -65,9 +65,9 @@ final class ModelCatalogStore: ObservableObject {
         }
     }
 
-    // MARK: - Modelele afisate si alegerea modelului
+    // MARK: - Displayed models and model selection
 
-    /// Accesibile cheii si cu pret cunoscut.
+    /// Accessible to the key and with a known price.
     var available: [ClaudeModelInfo] {
         ModelCatalog.priced(models, in: prices)
     }
@@ -76,7 +76,7 @@ final class ModelCatalogStore: ObservableObject {
         ModelCatalog.grouped(available)
     }
 
-    /// ID-ul folosit efectiv pentru selectia din setari (vezi ModelCatalog.resolve).
+    /// The ID actually used for the selection in the settings (see ModelCatalog.resolve).
     func resolvedID(for selection: String) -> String {
         ModelCatalog.resolve(selection, in: available)
     }
@@ -93,14 +93,14 @@ final class ModelCatalogStore: ObservableObject {
         rejected[ClaudeModels.baseID(id)] ?? []
     }
 
-    /// Fast mode se poate cere: modelul il are in lista de preturi si API-ul nu l-a refuzat.
+    /// Fast mode can be requested: the model has it in the price list and the API hasn't rejected it.
     func mayUseFastMode(_ id: String) -> Bool {
         prices.entry(for: id)?.supportsFastMode == true && !rejectedFeatures(for: id).contains("speed")
     }
 
-    // MARK: - Reincarcare
+    // MARK: - Reloading
 
-    /// Reincarca ce e vechi: modelele o data pe zi, preturile o data pe saptamana.
+    /// Reloads what is stale: the models once a day, the prices once a week.
     func refreshIfStale(apiKey: String?) {
         if Self.isDue(lastSuccess: models.isEmpty ? nil : fetchedAt, lastAttempt: modelsAttempt, maxAge: Self.modelsMaxAge) {
             refresh(apiKey: apiKey)
@@ -117,8 +117,8 @@ final class ModelCatalogStore: ObservableObject {
         return now.timeIntervalSince(lastSuccess) >= maxAge
     }
 
-    /// `manual`: ceruta din setari; reincarca si preturile si uita parametrii refuzati, ca sa fie incercati din nou
-    /// (Anthropic poate activa fast mode pe un model mai tarziu).
+    /// `manual`: requested from the settings; also reloads the prices and forgets the rejected parameters, so they are
+    /// tried again (Anthropic may enable fast mode on a model later).
     func refresh(apiKey: String?, manual: Bool = false) {
         if manual { refreshPrices() }
         guard !isLoading, let key = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty else { return }
@@ -132,17 +132,17 @@ final class ModelCatalogStore: ObservableObject {
                 fetchedAt = Date()
                 if manual { rejected = [:] }
                 save()
-                Log.ai.info("Lista de modele: \(list.count) modele")
+                Log.ai.info("Model list: \(list.count) models")
             } catch {
                 lastError = error.localizedDescription
-                Log.ai.error("Lista de modele: \(error.localizedDescription, privacy: .public)")
+                Log.ai.error("Model list: \(error.localizedDescription, privacy: .public)")
             }
             isLoading = false
         }
     }
 
-    /// Citeste lista de preturi. Trimite ID-ul aleator al instalarii si versiunea aplicatiei (doar aici),
-    /// ca autorul sa vada cate instalari folosesc aplicatia; serverul noteaza si data si IP-ul.
+    /// Fetches the price list. Sends the random install ID and the app version (only here),
+    /// so the author can see how many installs use the app; the server also records the date and the IP.
     func refreshPrices() {
         guard !pricesLoading else { return }
         pricesLoading = true
@@ -160,17 +160,17 @@ final class ModelCatalogStore: ObservableObject {
                 let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                 guard status == 200 else { throw HTTPStatusError(code: status) }
                 let list = try PriceList.decode(data)
-                // Castiga lista mai noua: dupa o actualizare, copia din aplicatie poate fi mai noua decat cea de pe server.
+                // The newer list wins: after an update, the copy in the app can be newer than the one on the server.
                 prices = list.stamp >= PriceList.bundled.stamp ? list : .bundled
                 pricesFetchedAt = Date()
                 pricesError = nil
                 save()
                 let updated = list.updated ?? "?"
-                Log.ai.info("Preturi: \(list.models.count) modele, actualizate \(updated, privacy: .public)")
+                Log.ai.info("Prices: \(list.models.count) models, updated \(updated, privacy: .public)")
             } catch {
                 let message = Self.describe(error)
                 pricesError = message
-                Log.ai.error("Preturi: \(message, privacy: .public)")
+                Log.ai.error("Prices: \(message, privacy: .public)")
             }
             pricesLoading = false
         }
@@ -184,7 +184,7 @@ final class ModelCatalogStore: ObservableObject {
         }
     }
 
-    /// Tine minte parametrii pe care API-ul i-a refuzat pentru model (raportati de ClaudeCorrector.correct).
+    /// Remembers the parameters the API rejected for the model (reported by ClaudeCorrector.correct).
     func noteRejected(_ features: Set<String>, for model: String) {
         guard !features.isEmpty else { return }
         let key = ClaudeModels.baseID(model)
@@ -192,7 +192,7 @@ final class ModelCatalogStore: ObservableObject {
         guard merged != rejected[key] else { return }
         rejected[key] = merged
         save()
-        Log.ai.info("\(key, privacy: .public) refuza: \(merged.sorted().joined(separator: ", "), privacy: .public)")
+        Log.ai.info("\(key, privacy: .public) rejects: \(merged.sorted().joined(separator: ", "), privacy: .public)")
     }
 
     private func save() {

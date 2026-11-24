@@ -3,7 +3,7 @@ import Foundation
 public struct HistoryEntry: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
     public var date: Date
-    /// Aplicatia si fereastra in care a inceput dictarea (acolo se insereaza si textul).
+    /// The app and window where the dictation started (the text is also inserted there).
     public var appName: String?
     public var windowTitle: String?
     public var rawText: String
@@ -14,9 +14,9 @@ public struct HistoryEntry: Codable, Identifiable, Hashable, Sendable {
     public var transcriptionTime: Double
     public var correctionTime: Double?
     public var note: String?
-    /// Tokenii si costul corecturii Claude (nil daca nu s-a apelat Claude).
+    /// Tokens and cost of the Claude correction (nil if Claude was not called).
     public var usage: CorrectionUsage?
-    /// Cuvintele transcrierii Whisper, cu probabilitatea fiecaruia (nil la intrarile mai vechi).
+    /// The words of the Whisper transcript, each with its probability (nil for older entries).
     public var words: [TranscribedWord]?
 
     public init(id: UUID = UUID(), date: Date = Date(), appName: String?, rawText: String, finalText: String,
@@ -42,7 +42,7 @@ public struct HistoryEntry: Codable, Identifiable, Hashable, Sendable {
     public var costUSD: Double? { usage?.costUSD }
 }
 
-/// Rezumatul unei selectii din istoric (pentru filtrele pe interval).
+/// Summary of a history selection (for the date range filters).
 public struct HistorySummary: Equatable, Sendable {
     public var count: Int
     public var correctedCount: Int
@@ -64,18 +64,18 @@ public struct HistorySummary: Equatable, Sendable {
 }
 
 extension Array where Element == HistoryEntry {
-    /// Intrarile cu data in [from, to] (inclusiv).
+    /// The entries dated within [from, to] (inclusive).
     public func between(_ from: Date, _ to: Date) -> [HistoryEntry] {
         filter { $0.date >= from && $0.date <= to }
     }
 }
 
-/// Istoric local, pastrat pe o perioada (implicit 3 luni). Cele mai noi intrari primele.
-/// Format: JSON Lines (o intrare pe linie). Adaugarea scrie doar o linie, deci ramane rapida
-/// si cu zeci de mii de intrari; fisierul se rescrie doar la curatarea intrarilor vechi sau la stergere.
+/// Local history, kept for a set period (3 months by default). Newest entries first.
+/// Format: JSON Lines (one entry per line). Appending writes a single line, so it stays fast
+/// even with tens of thousands of entries; the file is rewritten only when old entries are pruned or on deletion.
 public final class HistoryStore: @unchecked Sendable {
     public let fileURL: URL
-    /// Fisierul vechi (un singur array JSON); se migreaza automat in formatul nou.
+    /// The old file (a single JSON array); it is migrated to the new format automatically.
     public let legacyFileURL: URL?
     public var retentionMonths: Int
 
@@ -91,7 +91,7 @@ public final class HistoryStore: @unchecked Sendable {
         self.now = now
     }
 
-    /// Intrarile mai vechi de aceasta data se sterg.
+    /// Entries older than this date are deleted.
     public var cutoffDate: Date {
         Calendar(identifier: .gregorian).date(byAdding: .month, value: -retentionMonths, to: now()) ?? .distantPast
     }
@@ -112,7 +112,7 @@ public final class HistoryStore: @unchecked Sendable {
         if let line = encodeLine(entry) {
             appendToFile(line)
         }
-        // Curatenie cel mult o data pe zi, ca sa nu rescriem fisierul la fiecare dictare.
+        // Prune at most once a day, so the file is not rewritten on every dictation.
         if let lastPrune, now().timeIntervalSince(lastPrune) < 24 * 3600 { return entries }
         return pruneLocked(entries)
     }
@@ -135,7 +135,7 @@ public final class HistoryStore: @unchecked Sendable {
         if let legacyFileURL { try? FileManager.default.removeItem(at: legacyFileURL) }
     }
 
-    // MARK: - Implementare
+    // MARK: - Implementation
 
     private func loadLocked() -> [HistoryEntry] {
         if let cache { return cache }
@@ -170,7 +170,7 @@ public final class HistoryStore: @unchecked Sendable {
         let decoder = Self.makeDecoder()
         var result: [HistoryEntry] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
-            // O linie corupta (ex: scriere intrerupta) e ignorata, nu strica restul istoricului.
+            // A corrupt line (e.g. an interrupted write) is skipped; it does not break the rest of the history.
             if let entry = try? decoder.decode(HistoryEntry.self, from: Data(line.utf8)) {
                 result.append(entry)
             }
@@ -201,20 +201,20 @@ public final class HistoryStore: @unchecked Sendable {
             _ = try handle.seekToEnd()
             try handle.write(contentsOf: line)
         } catch {
-            // Istoricul e optional: nu oprim fluxul de dictare pentru o eroare de scriere.
+            // The history is optional: a write error does not stop the dictation flow.
         }
     }
 
     private func rewriteLocked(_ entries: [HistoryEntry]) {
         var data = Data()
-        for entry in entries.reversed() { // in fisier: cele mai vechi primele, ca la adaugare
+        for entry in entries.reversed() { // in the file: oldest first, as when appending
             if let line = encodeLine(entry) { data.append(line) }
         }
         do {
             try FileManager.default.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try data.write(to: fileURL, options: .atomic)
         } catch {
-            // vezi appendToFile
+            // see appendToFile
         }
     }
 
@@ -232,7 +232,7 @@ public final class HistoryStore: @unchecked Sendable {
     }
 }
 
-/// Export CSV (deschis direct in Excel / Numbers).
+/// CSV export (opens directly in Excel / Numbers).
 public enum HistoryCSV {
     public static func make(_ entries: [HistoryEntry]) -> String {
         let formatter = ISO8601DateFormatter()
@@ -260,7 +260,7 @@ public enum HistoryCSV {
                 entry.rawText,
                 entry.finalText,
                 entry.note ?? "",
-                // Cuvintele sub 50% intre ⟦ si ⟧, apoi fiecare cuvant cu procentul lui ("Am:98 facut:95").
+                // Words under 50% between ⟦ and ⟧, then every word with its percentage ("Am:98 facut:95").
                 entry.words.map { WordConfidence.marked($0) } ?? "",
                 entry.words.map { WordConfidence.summary($0) } ?? "",
             ]
@@ -275,8 +275,8 @@ public enum HistoryCSV {
     }
 }
 
-/// Intervale predefinite pentru filtrul din istoric.
-/// Intervalele din istoric (fara calendar): azi, saptamana asta, luna asta, tot.
+/// Predefined ranges for the history filter.
+/// The history ranges (no calendar): today, this week, this month, all.
 public enum HistoryRange: String, CaseIterable, Identifiable, Sendable {
     case today, thisWeek, thisMonth, all
 
@@ -291,8 +291,8 @@ public enum HistoryRange: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// [inceput, sfarsit] inclusiv, pana la finalul zilei curente. Saptamana incepe luni, ca in Romania, oricum ar fi
-    /// setat Mac-ul. "Tot intervalul" = tot istoricul pastrat (ultimele 3 luni), fara limite.
+    /// [start, end] inclusive, up to the end of the current day. The week starts on Monday, as in Romania, regardless
+    /// of the Mac's settings. "All time" = all the retained history (the last 3 months), with no bounds.
     public func dates(now: Date = Date(), calendar: Calendar = .current) -> (from: Date, to: Date) {
         let startOfToday = calendar.startOfDay(for: now)
         let endOfToday = calendar.date(byAdding: DateComponents(day: 1, second: -1), to: startOfToday) ?? now

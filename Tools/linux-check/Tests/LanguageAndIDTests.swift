@@ -11,7 +11,7 @@ final class UUIDv7Tests: XCTestCase {
         XCTAssertEqual(Array(text)[14], "7")
         XCTAssertTrue("89ab".contains(Array(text)[19]))
         XCTAssertEqual(UUIDv7.date(of: uuid).timeIntervalSince1970, 1_795_000_000.123, accuracy: 0.001)
-        // Un UUID v4 (ID-ul vechi) nu e v7 si se inlocuieste.
+        // A v4 UUID (the old ID) is not v7 and gets replaced.
         XCTAssertFalse(UUIDv7.isValid("3f2c1e9a-8b7d-4c6e-9f10-a1b2c3d4e5f6"))
         XCTAssertFalse(UUIDv7.isValid("nu-e-uuid"))
     }
@@ -70,14 +70,14 @@ final class DiacriticsPerLanguageTests: XCTestCase {
         XCTAssertEqual(Diacritics.strip("Œuvre, cœur, élève, français", language: .french), "Oeuvre, coeur, eleve, francais")
         XCTAssertEqual(Diacritics.strip("köszönöm, szép, tűz", language: .hungarian), "koszonom, szep, tuz")
         XCTAssertEqual(Diacritics.strip("perché città", language: .italian), "perche citta")
-        XCTAssertEqual(Diacritics.strip("Știința și țara"), "Stiinta si tara", "implicit: romana")
+        XCTAssertEqual(Diacritics.strip("Știința și țara"), "Stiinta si tara", "default: Romanian")
     }
 
     func testLettersAndPromptRules() {
         XCTAssertNil(DictationLanguage.english.diacriticLetters)
         XCTAssertNil(DictationLanguage.english.diacriticsLabel)
         XCTAssertEqual(DictationLanguage.german.diacriticsLabel, "With umlauts and ß (ä ö ü ß)")
-        XCTAssertFalse(DictationLanguage.spanish.diacriticsLabel?.contains("ñ") ?? true, "ñ ramane si fara accente")
+        XCTAssertFalse(DictationLanguage.spanish.diacriticsLabel?.contains("ñ") ?? true, "ñ stays even without accents")
         XCTAssertEqual(Set(DictationLanguage.allCases.filter { $0.diacriticsLabel == nil }), [.english])
         XCTAssertEqual(DictationLanguage.romanian.diacriticLetters, "ă â î ș ț")
         let german = CorrectionPrompt.languageSection(language: .german, mixesEnglish: false, useDiacritics: false)

@@ -23,8 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         AppServices.shared.start()
     }
 
-    /// Ultima instanta pornita castiga: o inchidem pe cea veche (ex: copia rulata din Xcode
-    /// vs. cea din /Applications), altfel ambele ar asculta combinatia si ar insera textul de doua ori.
+    /// The last instance launched wins: we quit the old one (e.g. the copy run from Xcode
+    /// vs. the one in /Applications), otherwise both would listen for the key combination and insert the text twice.
     private func terminateOtherInstances() {
         let current = NSRunningApplication.current.processIdentifier
         for bundleID in [AppInfo.bundleID] + AppInfo.legacyBundleIDs {
@@ -39,9 +39,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         false
     }
 
-    /// ⌘Q (sau hau-di → Quit) din fereastra de setari inchide doar fereastra: hau-di ramane in bara de meniu.
-    /// Inchidem de-adevaratelea la „Iesire” din meniul din bara si la cererile venite prin Apple Event
-    /// (logout, restart, oprire, Quit din Dock, o instanta noua hau-di care o inlocuieste pe asta).
+    /// ⌘Q (or hau-di → Quit) in the settings window only closes the window: hau-di stays in the menu bar.
+    /// We really quit on "Quit" in the menu bar menu and on requests that arrive as Apple Events
+    /// (logout, restart, shutdown, Quit from the Dock, a new hau-di instance that replaces this one).
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let services = AppServices.shared
         if services.quitRequested || NSAppleEventManager.shared().currentAppleEvent != nil {
@@ -54,7 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-/// Starea UI pentru monitorul de taste (inregistrarea unei combinatii noi, status).
+/// UI state for the key monitor (recording a new key combination, status).
 @MainActor
 final class HotkeyUIModel: ObservableObject {
     @Published var isCapturing = false
@@ -63,7 +63,7 @@ final class HotkeyUIModel: ObservableObject {
     @Published var listenOnly = false
 }
 
-/// Radacina de compozitie: creeaza si leaga toate serviciile aplicatiei.
+/// Composition root: creates and wires together all of the app's services.
 @MainActor
 final class AppServices {
     static let shared = AppServices()
@@ -87,7 +87,7 @@ final class AppServices {
 
     private var cancellables = Set<AnyCancellable>()
     private var started = false
-    /// Iesire ceruta explicit (din meniul din bara sau la repornire); altfel ⌘Q doar inchide setarile.
+    /// Quit requested explicitly (from the menu bar menu or on relaunch); otherwise ⌘Q only closes the settings.
     private(set) var quitRequested = false
 
     func quit() {
@@ -108,7 +108,7 @@ final class AppServices {
         navigation = SettingsNavigation()
         models = ModelCatalogStore(fileURL: AppPaths.modelsFile, pricesURL: AppInfo.pricingURL,
                                    installID: settings.installID)
-        // La prima pornire cu bugetul, suma lunii porneste de la ce arata istoricul pentru luna asta.
+        // On the first launch with the budget, the month's total starts from what the history shows for this month.
         let month = HistoryRange.thisMonth.dates()
         budget = BudgetTracker(initialSpend: HistorySummary(entries: history.entries.between(month.from, month.to)).totalCostUSD)
         controller = DictationController(settings: settings, permissions: permissions, transcription: transcription,
@@ -144,7 +144,7 @@ final class AppServices {
         }
     }
 
-    // MARK: - Monitorul de taste
+    // MARK: - Key monitor
 
     private func wireHotkeyMonitor() {
         hotkeyMonitor.onEvent = { [weak self] event in
@@ -164,7 +164,7 @@ final class AppServices {
     func startHotkeyMonitorIfPossible() {
         permissions.refresh()
         if hotkeyMonitor.isRunning {
-            // Pornit initial doar cu Input Monitoring; cu Accessibility putem consuma si Esc.
+            // Started initially with Input Monitoring only; with Accessibility we can also consume Esc.
             if hotkeyMonitor.isListenOnly && permissions.accessibility {
                 hotkeyMonitor.stop()
                 hotkeyMonitor.start()
@@ -181,7 +181,7 @@ final class AppServices {
         startHotkeyMonitorIfPossible()
     }
 
-    /// Unele versiuni macOS permit crearea event tap-ului abia dupa repornirea aplicatiei.
+    /// Some macOS versions allow creating the event tap only after the app is relaunched.
     func relaunch() {
         let configuration = NSWorkspace.OpenConfiguration()
         configuration.createsNewApplicationInstance = true
@@ -211,7 +211,7 @@ final class AppServices {
         }
     }
 
-    // MARK: - Reactii la schimbari
+    // MARK: - Reacting to changes
 
     private func observeChanges() {
         settings.$hotkey
@@ -251,14 +251,14 @@ final class AppServices {
             .removeDuplicates { $0 == $1 }
             .dropFirst()
             .sink { [weak self] _, _ in
-                // Publisher-ul emite inainte ca valoarea sa fie scrisa; amanam o bucla de runloop.
+                // The publisher emits before the value is written; defer by one runloop pass.
                 DispatchQueue.main.async { self?.startHotkeyMonitorIfPossible() }
             }
             .store(in: &cancellables)
     }
 }
 
-// MARK: - Ferestre
+// MARK: - Windows
 
 enum SettingsTab: String, Hashable, CaseIterable, Identifiable {
     case welcome, general, transcription, ai, dictionary, history
@@ -282,7 +282,7 @@ final class SettingsNavigation: ObservableObject {
     @Published var tab: SettingsTab = .welcome
 }
 
-/// Fereastra de setari gestionata din AppKit (mai previzibil decat scena Settings intr-o aplicatie de bara de meniu).
+/// The settings window, managed from AppKit (more predictable than the Settings scene in a menu bar app).
 @MainActor
 final class WindowManager: NSObject, NSWindowDelegate {
     private var window: NSWindow?
@@ -310,7 +310,7 @@ final class WindowManager: NSObject, NSWindowDelegate {
             window.center()
             self.window = window
         }
-        // Cat timp fereastra e deschisa, aplicatia apare in Dock si in ⌘⇥.
+        // While the window is open, the app appears in the Dock and in ⌘⇥.
         NSApp.setActivationPolicy(.regular)
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)

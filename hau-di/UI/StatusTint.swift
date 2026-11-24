@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Starea curenta, cu aceeasi culoare in rombul din bara de meniu si in rombul din pastila de jos.
+/// The current state, with the same color in the menu bar rhombus and in the rhombus of the bottom pill.
 enum StatusTint: Hashable {
     case idle
     case recording
@@ -9,7 +9,7 @@ enum StatusTint: Hashable {
     case correcting
     case inserting
 
-    /// nil = repaus: iconul e sablon (alb/negru, ca restul iconurilor din bara).
+    /// nil = idle: the icon is a template (white/black, like the other icons in the menu bar).
     var tone: BrandTone? {
         switch self {
         case .idle: return nil
@@ -21,8 +21,8 @@ enum StatusTint: Hashable {
     }
 }
 
-/// Iconul din bara de meniu: logo-ul din liniute (in culoarea barii); cand hau-di lucreaza, apare si rombul
-/// din mijloc, in culoarea starii. In repaus e doar forma.
+/// The menu bar icon: the striped logo (in the menu bar color); while hau-di is working, the middle rhombus
+/// also appears, in the state color. When idle it is only the shape.
 @MainActor
 enum MenuBarIcon {
     private static var cache: [StatusTint: NSImage] = [:]
@@ -31,8 +31,8 @@ enum MenuBarIcon {
         if let cached = cache[tint] { return cached }
         let layout = LogoGeometry.MenuBar.self
         let tone = tint.tone
-        // Culori dinamice: se rezolva la desenare, dupa tema barii (deschisa / inchisa).
-        // In repaus imaginea e sablon (negru, fara romb), iar macOS o coloreaza singur in alb sau negru.
+        // Dynamic colors: resolved at draw time, based on the menu bar theme (light / dark).
+        // When idle the image is a template (black, no rhombus), and macOS itself colors it white or black.
         let stripeColor: NSColor = tone == nil ? .black : .labelColor
         let rhombusColor: NSColor? = tone?.adaptiveNSColor
         let image = NSImage(size: NSSize(width: layout.width, height: layout.height), flipped: true) { _ in

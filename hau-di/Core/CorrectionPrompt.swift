@@ -1,18 +1,18 @@
 import Foundation
 
-/// Setari stabile ale corectiei (intra in system prompt -> prefix cache-uibil).
+/// Stable correction settings (they go into the system prompt -> cacheable prefix).
 public struct CorrectionConfig: Sendable, Equatable {
     public var level: CorrectionLevel
     public var dictionary: [String]
     public var snippets: [Snippet]
     public var customInstructions: String
-    /// false = textul final se scrie fara diacritice (ă→a, î→i, ș→s, ț→t...).
+    /// false = the final text is written without diacritics (ă→a, î→i, ș→s, ț→t...).
     public var useDiacritics: Bool
-    /// Limba dictarii (Whisper o primeste impusa); textul final ramane in ea.
+    /// The dictation language (forced on Whisper); the final text stays in it.
     public var language: DictationLanguage
-    /// „+ engleza”: utilizatorul amesteca cuvinte in engleza (romgleza, hungleza); Claude le scrie corect, in engleza.
+    /// "+ English": the user mixes in English words (Romglish, Hunglish); Claude spells them correctly, in English.
     public var mixesEnglish: Bool
-    /// Transcrierea vine cu cuvintele nesigure marcate ⟦...⟧ (WordConfidence). Deocamdata doar in testul A/B.
+    /// The transcript comes with the unsure words marked ⟦...⟧ (WordConfidence). Only in the A/B test for now.
     public var marksUncertainWords: Bool
 
     public init(level: CorrectionLevel = .standard, dictionary: [String] = [], snippets: [Snippet] = [],
@@ -29,7 +29,7 @@ public struct CorrectionConfig: Sendable, Equatable {
     }
 }
 
-/// Context volatil, trimis in mesajul utilizatorului (nu strica cache-ul system prompt-ului).
+/// Volatile context, sent in the user message (it does not break the system prompt cache).
 public struct CorrectionContext: Sendable, Equatable {
     public var appName: String?
     public var bundleID: String?
@@ -48,7 +48,7 @@ public struct CorrectionContext: Sendable, Equatable {
 }
 
 public enum CorrectionPrompt {
-    /// Schema JSON pentru structured outputs: {"text": "..."}.
+    /// The JSON schema for structured outputs: {"text": "..."}.
     public static let outputSchema: JSONValue = .object([
         "type": .string("object"),
         "properties": .object([
@@ -145,9 +145,9 @@ public enum CorrectionPrompt {
         return formatter.string(from: date)
     }
 
-    // MARK: - Sectiuni
+    // MARK: - Sections
 
-    /// Cuvintele sub pragul de incredere al lui Whisper vin intre ⟦ si ⟧ (vezi WordConfidence.marked).
+    /// Words below Whisper's confidence threshold come between ⟦ and ⟧ (see WordConfidence.marked).
     static let uncertainWordsSection = """
     ## Words the recognizer was unsure about
     In the transcript, words the speech recognizer had low confidence in are wrapped in \(WordConfidence.openMark) and \(WordConfidence.closeMark), for example "am trimis la \(WordConfidence.openMark)Audi\(WordConfidence.closeMark)". They are the most likely misrecognitions: check each one against the rest of the sentence, the context and the user dictionary, and write what the user most plausibly said (often a technical term or an English word that was transcribed by ear). If a marked word already fits, keep it. Unmarked words can be wrong too, just less often. Never output the markers themselves.
@@ -164,8 +164,8 @@ public enum CorrectionPrompt {
     - If the transcript has no real content (silence, noise, only hesitation sounds), return an empty string.
     """
 
-    /// Limba textului final si, cu „+ engleza”, cuvintele spuse in engleza (pe care Whisper, setat pe limba aleasa,
-    /// le poate scrie dupa ureche): Claude le scrie corect, in engleza, fara sa traduca nimic.
+    /// The language of the final text and, with "+ English", the words spoken in English (which Whisper, set to the
+    /// chosen language, may spell by ear): Claude spells them correctly, in English, without translating anything.
     static func languageSection(language: DictationLanguage, mixesEnglish: Bool, useDiacritics: Bool) -> String {
         let name = language.englishName
         var lines = ["- The user dictates in \(name), and the speech recognizer was set to \(name). Write the final text in \(name); never translate it into another language."]
@@ -194,7 +194,7 @@ public enum CorrectionPrompt {
         return "## Language\n" + lines.joined(separator: "\n")
     }
 
-    /// Diacriticele limbii dictarii: scrise corect sau, la cerere, deloc (cum se scrie limba fara ele).
+    /// The dictation language's diacritics: correct or, on request, none (as the language is written without them).
     static func diacriticsRule(language: DictationLanguage, useDiacritics: Bool) -> String? {
         switch (language, useDiacritics) {
         case (.english, _):

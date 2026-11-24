@@ -5,7 +5,7 @@ import Combine
 import Security
 import ServiceManagement
 
-// MARK: - Keychain (cheia API Anthropic)
+// MARK: - Keychain (the Anthropic API key)
 
 enum KeychainStore {
     private static let account = "anthropic-api-key"
@@ -54,8 +54,8 @@ enum KeychainStore {
         SecItemDelete(baseQuery as CFDictionary)
     }
 
-    /// Cheia salvata de o versiune cu bundle ID vechi: o copiem pe ID-ul curent si o stergem pe cea veche.
-    /// macOS poate cere o singura data parola de login pentru acces (elementul a fost creat de "alta" aplicatie).
+    /// A key saved by a version with an old bundle ID: we copy it to the current ID and delete the old one.
+    /// macOS may ask once for the login password to grant access (the item was created by "another" app).
     static func migrateLegacyKey() -> String? {
         for legacyID in AppInfo.legacyBundleIDs where legacyID != AppInfo.bundleID {
             let legacyService = service(for: legacyID)
@@ -69,7 +69,7 @@ enum KeychainStore {
     }
 }
 
-/// Cheia API tinuta in memorie (citim Keychain-ul o singura data).
+/// The API key, kept in memory (we read the Keychain only once).
 @MainActor
 final class APIKeyStore: ObservableObject {
     @Published private(set) var apiKey: String?
@@ -80,7 +80,7 @@ final class APIKeyStore: ObservableObject {
         if let key = KeychainStore.read() {
             apiKey = key
         } else if !UserDefaults.standard.bool(forKey: Self.legacyMigrationKey) {
-            // O singura incercare: daca utilizatorul refuza accesul, nu-l mai intrebam la fiecare pornire.
+            // A single attempt: if the user denies access, we don't ask again on every launch.
             UserDefaults.standard.set(true, forKey: Self.legacyMigrationKey)
             apiKey = KeychainStore.migrateLegacyKey()
         } else {
@@ -113,7 +113,7 @@ final class APIKeyStore: ObservableObject {
     }
 }
 
-// MARK: - Permisiuni
+// MARK: - Permissions
 
 @MainActor
 final class PermissionsManager: ObservableObject {
@@ -168,7 +168,7 @@ final class PermissionsManager: ObservableObject {
         refresh()
     }
 
-    /// Afiseaza dialogul de sistem care trimite utilizatorul in Privacy & Security > Accessibility.
+    /// Shows the system dialog that sends the user to Privacy & Security > Accessibility.
     func requestAccessibility() {
         let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
@@ -185,7 +185,7 @@ final class PermissionsManager: ObservableObject {
     }
 }
 
-// MARK: - Pornire la login
+// MARK: - Launch at login
 
 enum LoginItem {
     static var isEnabled: Bool { SMAppService.mainApp.status == .enabled }
@@ -199,7 +199,7 @@ enum LoginItem {
     }
 }
 
-// MARK: - Sunete
+// MARK: - Sounds
 
 @MainActor
 enum SoundEffects {

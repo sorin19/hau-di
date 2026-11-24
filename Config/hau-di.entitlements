@@ -2,8 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- Fara App Sandbox: CGEventTap, Accessibility si lipirea in alte aplicatii nu functioneaza in sandbox. -->
-	<!-- Necesar doar cand Hardened Runtime e activ (ex: pentru notarizare). -->
+	<!-- No App Sandbox: CGEventTap, Accessibility and pasting into other apps don't work in the sandbox. -->
+	<!-- Needed only when the Hardened Runtime is enabled (e.g. for notarization). -->
 	<key>com.apple.security.device.audio-input</key>
 	<true/>
 </dict>

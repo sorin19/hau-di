@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Aseaza elementele pe randuri, ca un text: trece pe randul urmator cand nu mai incap.
+/// Lays the elements out in rows, like text: wraps to the next row when they no longer fit.
 struct ChipFlowLayout: Layout {
     var spacing: CGFloat = 4
     var lineSpacing: CGFloat = 4

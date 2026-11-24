@@ -11,9 +11,9 @@ struct DictionarySettingsView: View {
     @State private var newTerm = ""
     @State private var trigger = ""
     @State private var expansion = ""
-    /// Cati termeni (de la inceputul listei) ajung la Whisper; nil cat timp modelul nu e incarcat.
+    /// How many terms (from the start of the list) reach Whisper; nil while the model is not loaded.
     @State private var whisperReach: Int?
-    /// Termenul peste care se trage acum un alt termen (cel tras ajunge in fata lui).
+    /// The term another term is being dragged over right now (the dragged one lands in front of it).
     @State private var dropTarget: String?
     @State private var suggestions: [DictionarySuggestion] = []
     @State private var showAllSuggestions = false
@@ -34,7 +34,7 @@ struct DictionarySettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                // Camp cu chenar vizibil, pe toata latimea, aliniat cu butonul (in Form, eticheta ar sta separat in stanga).
+                // Bordered full-width field aligned with the button (in a Form, the label would sit apart on the left).
                 HStack(alignment: .center, spacing: 8) {
                     TextField("New term", text: $newTerm, prompt: Text("Add terms, separated by commas (e.g. Kubernetes, Ștefănescu, hau-di)"))
                         .labelsHidden()
@@ -159,14 +159,14 @@ struct DictionarySettingsView: View {
         }
     }
 
-    // MARK: - Termeni
+    // MARK: - Terms
 
     private struct ReachKey: Equatable {
         var terms: [String]
         var ready: Bool
     }
 
-    /// true/false = ajunge sau nu la Whisper; nil = nu se stie inca (modelul nu e incarcat).
+    /// true/false = reaches Whisper or not; nil = not known yet (the model is not loaded).
     private func reachesWhisper(_ index: Int) -> Bool? {
         guard settings.whisperDictionaryHint else { return false }
         return whisperReach.map { index < $0 }
@@ -187,7 +187,7 @@ struct DictionarySettingsView: View {
         return "Whisper also gets the first \(reach) of \(count) terms (marked in blue); Claude gets all of them. " + tip
     }
 
-    /// Termenii noi intra la inceput, in ordinea scrisa: asa ajung la Whisper (care vede doar primii).
+    /// New terms go at the start, in the order typed: that way they reach Whisper (which only sees the first ones).
     private func addTerm() {
         var seen = Set(settings.dictionary)
         var added: [String] = []
@@ -204,7 +204,7 @@ struct DictionarySettingsView: View {
         if dropTarget == term { dropTarget = nil }
     }
 
-    /// Termenul tras ajunge in fata celui peste care e lasat. Un text tras din alta parte devine termen nou.
+    /// The dragged term lands in front of the one it is dropped on. Text dragged from elsewhere becomes a new term.
     private func insert(_ dragged: String?, before target: String) -> Bool {
         dropTarget = nil
         guard let dragged = dragged?.trimmingCharacters(in: .whitespacesAndNewlines), !dragged.isEmpty,
@@ -232,9 +232,9 @@ struct DictionarySettingsView: View {
         settings.dictionary = list
     }
 
-    // MARK: - Sugestii
+    // MARK: - Suggestions
 
-    /// Sugestiile de afisat: cele care nu sunt in dictionar, plus cele care sunt, dar nu ajung la Whisper.
+    /// The suggestions to show: those not in the dictionary, plus those that are but do not reach Whisper.
     private var visibleSuggestions: [VisibleSuggestion] {
         let keys = settings.dictionary.map { DictionarySuggestions.key($0) }
         let ignored = Set(settings.ignoredSuggestions)
@@ -248,8 +248,8 @@ struct DictionarySettingsView: View {
         }
     }
 
-    /// Termenul propus sau editat intra la inceputul dictionarului. Unul deja in dictionar (dar care nu ajunge la
-    /// Whisper) se muta la inceput. Daca a fost editat, sugestia initiala se ascunde: e rezolvata.
+    /// The proposed or edited term goes at the start of the dictionary. A term already there (but not reaching
+    /// Whisper) moves to the start. If it was edited, the original suggestion is hidden: it is resolved.
     private func addSuggestion(_ item: VisibleSuggestion, term: String) {
         if item.position != nil,
            let existing = settings.dictionary.first(where: { DictionarySuggestions.key($0) == item.suggestion.key }) {
@@ -264,7 +264,7 @@ struct DictionarySettingsView: View {
         }
     }
 
-    /// Recalculat la deschidere si dupa fiecare dictare noua, in afara firului principal (tot istoricul).
+    /// Recomputed on open and after every new dictation, off the main thread (it covers the whole history).
     private func refreshSuggestions() async {
         let entries = history.entries
         let ignored = Set(settings.ignoredSuggestions)
@@ -284,13 +284,13 @@ struct DictionarySettingsView: View {
 
 private struct VisibleSuggestion: Identifiable {
     let suggestion: DictionarySuggestion
-    /// Locul in dictionar, daca termenul e deja acolo (dar nu ajunge la Whisper).
+    /// The position in the dictionary, if the term is already there (but does not reach Whisper).
     let position: Int?
     var id: String { suggestion.id }
 }
 
-/// Un termen din dictionar, ca eticheta: fundal la hover (ca sa vezi ce stergi), × in interior.
-/// Albastru = ajunge si la Whisper. Linia din stanga arata unde intra termenul tras peste el.
+/// A dictionary term, as a tag: background on hover (so you see what you are deleting), × inside.
+/// Blue = also reaches Whisper. The line on the left shows where a term dragged over it will go.
 private struct DictionaryChip: View {
     let term: String
     let reachesWhisper: Bool?
@@ -344,7 +344,7 @@ private struct DictionaryChip: View {
     }
 }
 
-/// × din eticheta: rosu cu fundal rotund cand mouse-ul e chiar pe el.
+/// The × in the tag: red with a round background when the mouse is right on it.
 private struct ChipDeleteButton: View {
     let term: String
     let action: () -> Void
@@ -365,13 +365,13 @@ private struct ChipDeleteButton: View {
     }
 }
 
-/// O sugestie: termenul, de cate ori, scorul mediu al lui Whisper si ce a auzit; + / creion / ×.
+/// A suggestion: the term, how many times, Whisper's average score and what it heard; + / pencil / ×.
 private struct SuggestionRow: View {
     let item: VisibleSuggestion
-    /// Adauga termenul (cel propus sau cel editat) la inceputul dictionarului.
+    /// Adds the term (the proposed or the edited one) at the start of the dictionary.
     let onAdd: (String) -> Void
     let onIgnore: () -> Void
-    /// Editare pe loc, chiar pe randul sugestiei (campul de sus poate fi in afara ecranului): Enter adauga, Esc renunta.
+    /// In-place editing, right on the suggestion's row (the top field may be off screen): Enter adds, Esc cancels.
     @State private var editing = false
     @State private var draft = ""
     @FocusState private var fieldFocused: Bool
@@ -460,7 +460,7 @@ struct HistoryView: View {
     @ObservedObject private var settings: AppSettings
     @ObservedObject private var history: HistoryModel
     @State private var range: HistoryRange = .thisMonth
-    /// Ca in panoul din bara: intervalele se recalculeaza si cand fereastra ramane deschisa peste miezul noptii.
+    /// As in the menu bar panel: the ranges are recomputed even when the window stays open past midnight.
     @State private var now = Date()
     @State private var exportMessage: String?
 
@@ -471,7 +471,7 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        // Calculat la fiecare afisare, ca „Azi” sa ramana corect si dupa miezul noptii.
+        // Computed on every render, so that "Today" stays correct after midnight too.
         let dates = range.dates(now: now)
         let entries = history.entries.between(dates.from, dates.to)
         let summary = HistorySummary(entries: entries)
@@ -496,7 +496,7 @@ struct HistoryView: View {
             .padding(.vertical, 8)
 
             HStack(spacing: 14) {
-                // Rombul in culorile starilor: rosu = dictare (inregistrare), portocaliu = corectie Claude.
+                // The rhombus in the state colors: red = dictation (recording), orange = Claude correction.
                 Label {
                     Text("\(summary.count) \(summary.count == 1 ? "dictation" : "dictations")")
                 } icon: {
@@ -534,7 +534,7 @@ struct HistoryView: View {
             Divider()
 
             if entries.isEmpty {
-                // Umple spatiul de sub antet: altfel tot continutul (si antetul) ajunge centrat pe verticala.
+                // Fills the space below the header: otherwise everything (header included) ends up vertically centered.
                 ContentUnavailableView(history.entries.isEmpty ? "No dictations yet" : "Nothing in the selected range",
                                        systemImage: "waveform",
                                        description: Text(history.entries.isEmpty
@@ -542,7 +542,7 @@ struct HistoryView: View {
                                                          : "Choose another range above."))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                // Fiecare dictare e un card separat: de la data pana la butoane, totul tine de aceeasi intrare.
+                // Each dictation is its own card: from the date to the buttons, everything belongs to one entry.
                 ScrollView {
                     LazyVStack(spacing: 10) {
                         ForEach(entries) { entry in
@@ -564,7 +564,7 @@ struct HistoryView: View {
         }
     }
 
-    /// Tokenii din interval; „pretul de lista al modelului” duce la lista de preturi folosita de aplicatie.
+    /// The tokens in the range; "the model's list price" links to the price list used by the app.
     private func tokenSummary(_ summary: HistorySummary) -> AttributedString {
         var text = AttributedString("Tokens in range: \(summary.inputTokens.formatted()) input (including cache), "
                                     + "\(summary.outputTokens.formatted()) output. The cost is estimated from tokens × ")
@@ -580,13 +580,13 @@ struct HistoryView: View {
         panel.allowedContentTypes = [.commaSeparatedText]
         let stamp = DateFormatter()
         stamp.dateFormat = "yyyy-MM-dd"
-        // Numele dupa prima si ultima dictare exportata (la „Tot intervalul” nu exista limite de afisat).
+        // Named after the first and last exported dictation ("All time" has no bounds to show).
         let first = entries.map(\.date).min() ?? Date()
         let last = entries.map(\.date).max() ?? Date()
         panel.nameFieldStringValue = "hau-di-history-\(stamp.string(from: first))_\(stamp.string(from: last)).csv"
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            // BOM UTF-8: Excel recunoaste corect diacriticele.
+            // UTF-8 BOM: so that Excel recognizes the diacritics correctly.
             try ("\u{FEFF}" + HistoryCSV.make(entries)).write(to: url, atomically: true, encoding: .utf8)
             exportMessage = "Exported: \(url.lastPathComponent)"
         } catch {
@@ -600,7 +600,7 @@ private struct HistoryRow: View {
     let onDelete: () -> Void
     @State private var showRaw = false
 
-    /// 2026-11-21 21:15:03, indiferent de limba sistemului.
+    /// 2026-11-21 21:15:03, regardless of the system language.
     private static let timestamp: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -610,12 +610,12 @@ private struct HistoryRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Metadatele (data, aplicatia, modelul, costul) cu font monospace.
+            // The metadata (date, app, model, cost) in a monospaced font.
             HStack(spacing: 10) {
                 Text(Self.timestamp.string(from: entry.date))
                     .foregroundStyle(.primary)
                 if let app = entry.appName {
-                    // Aplicatia si fereastra in care a inceput dictarea.
+                    // The app and the window in which the dictation started.
                     Text([app, entry.windowTitle].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " — "))
                         .lineLimit(1)
                         .truncationMode(.middle)
@@ -682,7 +682,7 @@ private struct HistoryRow: View {
         if let usage = entry.usage {
             parts.append("\(usage.promptTokens) tokens in (\(usage.cacheReadTokens) from cache) / \(usage.outputTokens) out")
         }
-        // Sunt mai multe variante Whisper (Turbo, comprimat, Small): modelul ramane util la comparat.
+        // There are several Whisper variants (Turbo, compressed, Small): the model stays useful for comparisons.
         parts.append(entry.engine)
         return parts.joined(separator: " · ")
     }

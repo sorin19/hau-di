@@ -22,8 +22,8 @@ struct MenuBarView: View {
     @ObservedObject private var hotkeyUI: HotkeyUIModel
     @ObservedObject private var history: HistoryModel
     @ObservedObject private var budget: BudgetTracker
-    /// Momentul pentru „Azi” si pentru luna bugetului. SwiftUI nu redeseneaza panoul doar pentru ca a trecut timpul:
-    /// fara asta, a doua zi „Azi” arata costul de ieri. Se actualizeaza la schimbarea zilei si la deschiderea panoului.
+    /// The current time for "today" and for the budget month. SwiftUI does not redraw the panel just because time
+    /// passed: without this, the next day "today" shows yesterday's cost. Updated on day change and on panel open.
     @State private var now = Date()
 
     init(services: AppServices) {
@@ -62,7 +62,7 @@ struct MenuBarView: View {
 
             Divider()
 
-            // Toggle-uri (switch), aliniate la dreapta ca „+ English”.
+            // Toggles (switch style), aligned to the right like "+ English".
             panelSwitch("AI correction with Claude", isOn: $settings.correctionEnabled)
             if let label = settings.language.diacriticsLabel {
                 panelSwitch(label, isOn: $settings.useDiacritics)
@@ -73,7 +73,7 @@ struct MenuBarView: View {
                     .foregroundStyle(.orange)
             }
 
-            // Limba si „+ English” pe acelasi rand.
+            // Language and "+ English" on the same row.
             HStack(spacing: 12) {
                 Picker("Language", selection: $settings.language) {
                     ForEach(DictationLanguage.allCases) { language in
@@ -126,7 +126,7 @@ struct MenuBarView: View {
         .background(MenuBarPanelReader())
     }
 
-    /// Un toggle din panou: textul in stanga (cat tot randul), switch-ul in dreapta.
+    /// A toggle in the panel: the text on the left (as wide as the row), the switch on the right.
     private func panelSwitch(_ title: String, isOn: Binding<Bool>) -> some View {
         Toggle(isOn: isOn) {
             Text(title)
@@ -136,7 +136,7 @@ struct MenuBarView: View {
         .controlSize(.small)
     }
 
-    /// Deschide fereastra de setari si inchide panoul din bara de meniu (altfel ramane deschis peste ea).
+    /// Opens the settings window and closes the menu bar panel (otherwise it stays open on top of it).
     @MainActor
     private func openSettings(_ tab: SettingsTab) {
         MenuBarPanel.close()
@@ -183,8 +183,9 @@ struct MenuBarView: View {
         }
     }
 
-    /// Un singur rand: cate dictari si cate corecturi Claude azi (rombul rosu si portocaliu, ca in Istoric), iar in
-    /// dreapta costul de azi / al lunii / bugetul. Azi vine din istoric; luna si bugetul, din contorul bugetului.
+    /// A single row: how many dictations and how many Claude corrections today (red and orange rhombus, as in
+    /// History), and on the right the cost of today / of the month / the budget. Today comes from the history;
+    /// the month and the budget, from the budget tracker.
     private var costBox: some View {
         let limit = settings.monthlyBudget
         let status = budget.status(limit: limit)
@@ -241,7 +242,7 @@ struct MenuBarView: View {
             .foregroundStyle(.tertiary)
     }
 
-    /// Luna: portocaliu de la 80% din buget, rosu la 100%.
+    /// The month: orange from 80% of the budget, red at 100%.
     private func color(for status: BudgetStatus) -> Color {
         switch status {
         case .exceeded: return .red
@@ -283,13 +284,13 @@ struct MenuBarView: View {
     }
 }
 
-/// Panoul din bara de meniu (MenuBarExtra, stilul .window). SwiftUI nu are API ca sa-l inchizi din cod.
-/// Il inchidem ca printr-un click pe iconul din bara: asa ramane sincronizata si starea interna a SwiftUI,
-/// iar urmatorul click pe icon il deschide din prima. Daca butonul nu se gaseste (sau panoul nu reactioneaza),
-/// ascundem fereastra direct.
+/// The menu bar panel (MenuBarExtra, .window style). SwiftUI has no API to close it from code.
+/// We close it as if by a click on the menu bar icon: that way SwiftUI's internal state stays in sync too,
+/// and the next click on the icon opens it on the first try. If the button is not found (or the panel does not
+/// react), we hide the window directly.
 @MainActor
 enum MenuBarPanel {
-    /// Fereastra panoului, aflata de MenuBarPanelReader cand panoul e afisat.
+    /// The panel's window, found by MenuBarPanelReader when the panel is shown.
     fileprivate static weak var window: NSWindow?
 
     static func close() {
@@ -303,7 +304,7 @@ enum MenuBarPanel {
         }
     }
 
-    /// Butonul iconului din bara de meniu (aplicatia are un singur icon acolo).
+    /// The button of the menu bar icon (the app has a single icon there).
     private static func statusBarButton(excluding panel: NSWindow) -> NSStatusBarButton? {
         for candidate in NSApp.windows where candidate !== panel {
             if let button = find(in: candidate.contentView) { return button }
@@ -321,7 +322,7 @@ enum MenuBarPanel {
     }
 }
 
-/// View invizibil pus in panou: tine minte fereastra panoului, pentru MenuBarPanel.close().
+/// Invisible view placed in the panel: remembers the panel's window, for MenuBarPanel.close().
 private struct MenuBarPanelReader: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView { ReaderView() }
     func updateNSView(_ nsView: NSView, context: Context) {}

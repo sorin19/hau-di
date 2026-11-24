@@ -1,15 +1,15 @@
 import Foundation
 import WhisperKit
 
-/// Whisper rulat local prin WhisperKit (Core ML, Neural Engine pe Apple Silicon).
+/// Whisper run locally through WhisperKit (Core ML, Neural Engine on Apple Silicon).
 actor WhisperKitEngine: SpeechEngine {
     private let variant: String
     private var pipe: WhisperKit?
-    /// Prompt-ul cu dictionarul pentru ultima lista primita (se recalculeaza doar cand lista se schimba).
+    /// The dictionary prompt for the last list received (recomputed only when the list changes).
     private var promptCache: (vocabulary: [String], count: Int, tokens: [Int])?
 
-    /// Dictionarul ajunge la Whisper ca "text anterior": cel mult atatia termeni si tokeni (Whisper accepta pana la
-    /// 224 de tokeni de context; mai mult ar lua din atentia data audio-ului).
+    /// The dictionary reaches Whisper as "previous text": at most this many terms and tokens (Whisper accepts up to
+    /// 224 context tokens; more would take away from the attention given to the audio).
     static let maxPromptTerms = 60
     static let maxPromptTokens = 120
 
@@ -19,20 +19,20 @@ actor WhisperKitEngine: SpeechEngine {
 
     static var downloadBase: URL { AppPaths.whisperKitBase }
 
-    /// Structura creata de WhisperKit.download: <base>/models/argmaxinc/whisperkit-coreml/openai_whisper-<variant>
+    /// The structure created by WhisperKit.download: <base>/models/argmaxinc/whisperkit-coreml/openai_whisper-<variant>
     static func localModelFolder(variant: String) -> URL {
         downloadBase
             .appendingPathComponent("models/argmaxinc/whisperkit-coreml", isDirectory: true)
             .appendingPathComponent("openai_whisper-\(variant)", isDirectory: true)
     }
 
-    /// Scris de noi doar dupa ce WhisperKit.download s-a terminat cu succes.
+    /// Written by us only after WhisperKit.download has finished successfully.
     private static let completionMarker = ".hau-di-download-complete"
-    /// Marcajul scris inainte de redenumire (Haudi): modelele descarcate atunci raman valabile.
+    /// The marker written before the rename (Haudi): models downloaded back then stay valid.
     private static let legacyCompletionMarker = ".haudi-download-complete"
 
-    /// Fisierele esentiale exista. Folderele singure nu ajung: o descarcare intrerupta
-    /// (ex: aplicatia repornita din Xcode) lasa foldere .mlmodelc incomplete.
+    /// The essential files exist. The folders alone aren't enough: an interrupted download
+    /// (e.g. the app relaunched from Xcode) leaves incomplete .mlmodelc folders.
     static func hasRequiredFiles(in folder: URL) -> Bool {
         let fileManager = FileManager.default
         return ["MelSpectrogram", "AudioEncoder", "TextDecoder"].allSatisfy { name in
@@ -70,10 +70,10 @@ actor WhisperKitEngine: SpeechEngine {
 
         if !Self.isDownloaded(variant: variant) {
             do {
-                // Descarcarea se reia: fisierele deja complete (verificate prin metadate) nu se descarca din nou.
+                // The download resumes: already complete files (checked via metadata) aren't downloaded again.
                 folder = try await download(progress: progress)
             } catch {
-                // Fara internet, dar modelul pare complet pe disc: incercam totusi sa-l incarcam.
+                // No internet, but the model looks complete on disk: try to load it anyway.
                 guard !(error is CancellationError), Self.hasRequiredFiles(in: folder) else { throw error }
             }
             guard Self.hasRequiredFiles(in: folder) else {
@@ -88,15 +88,15 @@ actor WhisperKitEngine: SpeechEngine {
             pipe = try await load(folder: folder)
         } catch {
             try Task.checkCancellation()
-            Log.asr.error("Modelul nu s-a incarcat (\(error.localizedDescription, privacy: .public)); il repar.")
-            // 1) re-verificam toate fisierele (se descarca doar ce lipseste sau e invalid)
+            Log.asr.error("The model didn't load (\(error.localizedDescription, privacy: .public)); repairing it.")
+            // 1) re-check all the files (only what is missing or invalid is downloaded)
             Self.setComplete(false, folder: folder)
             folder = try await download(progress: progress)
             progress(.loading)
             do {
                 pipe = try await load(folder: folder)
             } catch {
-                // 2) ultima varianta: descarcare completa, de la zero
+                // 2) last resort: a full download, from scratch
                 try Task.checkCancellation()
                 try? FileManager.default.removeItem(at: folder)
                 folder = try await download(progress: progress)
@@ -108,7 +108,7 @@ actor WhisperKitEngine: SpeechEngine {
 
         self.pipe = pipe
 
-        // Incalzire: prima inferenta initializeaza lenes unele resurse Core ML.
+        // Warm-up: the first inference lazily initializes some Core ML resources.
         let warmup = DecodingOptions(verbose: false, task: .transcribe, language: "en", temperatureFallbackCount: 0,
                                      usePrefillPrompt: true, skipSpecialTokens: true, withoutTimestamps: true)
         _ = try? await pipe.transcribe(audioArray: [Float](repeating: 0, count: 16_000), decodeOptions: warmup)
@@ -141,12 +141,13 @@ actor WhisperKitEngine: SpeechEngine {
 
         var promptTokens: [Int]?
         if !vocabulary.isEmpty, let tokenizer = pipe.tokenizer {
-            // Dictionarul ca "previous text": Whisper prefera aceste grafii. Doar termeni intregi, cati incap.
+            // The dictionary as "previous text": Whisper prefers these spellings. Whole terms only, as many as fit.
             let prompt = promptTerms(vocabulary, tokenizer: tokenizer)
             if !prompt.tokens.isEmpty { promptTokens = prompt.tokens }
         }
 
-        // Limba e mereu impusa (fara detectie): Whisper transcrie in limba aleasa, nu traduce (vezi DictationLanguage).
+        // The language is always forced (no detection): Whisper transcribes in the chosen language and doesn't
+        // translate (see DictationLanguage).
         let options = DecodingOptions(
             verbose: false,
             task: .transcribe,
@@ -164,20 +165,20 @@ actor WhisperKitEngine: SpeechEngine {
         let results = try await pipe.transcribe(audioArray: audio, decodeOptions: options)
         let text = results.map(\.text).joined(separator: " ")
 
-        // Probabilitatea fiecarui cuvant, din cele ale token-urilor: vin la orice transcriere, deci fara
-        // pasul de timpi pe cuvinte (wordTimestamps) si fara intarziere.
+        // Each word's probability, from those of its tokens: they come with every transcription, so without
+        // the word-timing step (wordTimestamps) and without delay.
         guard let tokenizer = pipe.tokenizer else { return SpeechTranscript(text: text) }
         let segments = results.flatMap(\.segments).map { Self.words(in: $0, tokenizer: tokenizer) }
         return SpeechTranscript(text: text, words: WordConfidence.joined(segments))
     }
 
-    /// Cati termeni din dictionar (de la inceputul listei) ajung la Whisper; nil cat timp modelul nu e incarcat.
+    /// How many dictionary terms (from the start of the list) reach Whisper; nil while the model isn't loaded.
     func vocabularyReach(_ vocabulary: [String]) -> Int? {
         guard let tokenizer = pipe?.tokenizer else { return nil }
         return promptTerms(vocabulary, tokenizer: tokenizer).count
     }
 
-    /// Primii termeni care incap intregi in prompt (cel mult maxPromptTerms termeni si maxPromptTokens tokeni).
+    /// The first terms that fit whole in the prompt (at most maxPromptTerms terms and maxPromptTokens tokens).
     private func promptTerms(_ vocabulary: [String], tokenizer: WhisperTokenizer) -> (count: Int, tokens: [Int]) {
         if let cache = promptCache, cache.vocabulary == vocabulary { return (cache.count, cache.tokens) }
         var result: (count: Int, tokens: [Int]) = (0, [])
@@ -193,20 +194,20 @@ actor WhisperKitEngine: SpeechEngine {
         return result
     }
 
-    /// Cuvintele unui segment, cu probabilitatea lor. Token-urile speciale (<|ro|>, sfarsitul) nu intra, iar cei care
-    /// impart un caracter UTF-8 (ex: „ș”) se lipesc pana textul e valid.
+    /// A segment's words, with their probabilities. Special tokens (<|ro|>, the end token) are left out, and tokens
+    /// that split a UTF-8 character (e.g. "ș") are joined until the text is valid.
     private static func words(in segment: TranscriptionSegment, tokenizer: WhisperTokenizer) -> [TranscribedWord] {
         var pieces: [TokenPiece] = []
         var tokens: [Int] = []
         var logProbs: [Float] = []
         for (index, token) in segment.tokens.enumerated() where token < tokenizer.specialTokens.specialTokenBegin {
             tokens.append(token)
-            // tokenLogProbs[i] = [token-ul ales: log-probabilitatea lui], aliniat cu tokens.
+            // tokenLogProbs[i] = [the chosen token: its log-probability], aligned with tokens.
             if index < segment.tokenLogProbs.count, let logProb = segment.tokenLogProbs[index][token] {
                 logProbs.append(logProb)
             }
             let text = tokenizer.decode(tokens: tokens)
-            // Un caracter UTF-8 are cel mult 4 octeti: dupa 4 token-uri nu mai lipim.
+            // A UTF-8 character has at most 4 bytes: after 4 tokens we stop joining.
             if !text.contains("\u{FFFD}") || tokens.count >= 4 {
                 pieces.append(TokenPiece(text: text, logProbs: logProbs))
                 tokens.removeAll()

@@ -1,11 +1,11 @@
 import Foundation
 
-/// Un cuvant din transcrierea Whisper, cu increderea modelului in el.
+/// A word from the Whisper transcript, with the model's confidence in it.
 public struct TranscribedWord: Codable, Hashable, Sendable {
-    /// Cuvantul exact cum l-a scris Whisper, cu spatiul din fata (" facut", " pay.cx.ro,").
+    /// The word exactly as Whisper wrote it, with its leading space (" facut", " pay.cx.ro,").
     public var text: String
-    /// Probabilitatea, intre 0 si 1: media geometrica a probabilitatilor token-urilor lui
-    /// (fara punctuatia de la capete, ca o virgula nesigura sa nu faca nesigur cuvantul).
+    /// The probability, between 0 and 1: the geometric mean of its tokens' probabilities
+    /// (without the punctuation at either end, so that an unsure comma does not make the word unsure).
     public var probability: Double
 
     public init(text: String, probability: Double) {
@@ -13,14 +13,14 @@ public struct TranscribedWord: Codable, Hashable, Sendable {
         self.probability = probability
     }
 
-    // Chei scurte: istoricul pastreaza lista pentru fiecare dictare.
+    // Short keys: the history keeps the list for every dictation.
     enum CodingKeys: String, CodingKey {
         case text = "w"
         case probability = "p"
     }
 }
 
-/// Textul transcris si cuvintele lui, cu probabilitati (goala daca modelul nu le da).
+/// The transcribed text and its words, with probabilities (the list is empty if the model does not provide them).
 public struct SpeechTranscript: Sendable {
     public var text: String
     public var words: [TranscribedWord]
@@ -31,8 +31,8 @@ public struct SpeechTranscript: Sendable {
     }
 }
 
-/// Textul unui token Whisper (sau al catorva, cand un caracter UTF-8 ca „ș” e impartit intre ei),
-/// cu log-probabilitatile lor.
+/// The text of a Whisper token (or of several, when a UTF-8 character such as "ș" is split between them),
+/// with their log-probabilities.
 public struct TokenPiece: Equatable, Sendable {
     public var text: String
     public var logProbs: [Float]
@@ -43,21 +43,21 @@ public struct TokenPiece: Equatable, Sendable {
     }
 }
 
-/// Increderea lui Whisper pe cuvinte, calculata din probabilitatile token-urilor (vin la orice transcriere,
-/// deci fara pasul de timpi pe cuvinte si fara intarziere).
+/// Whisper's per-word confidence, computed from the token probabilities (they come with every transcription,
+/// so there is no word-timestamps step and no added delay).
 public enum WordConfidence {
-    /// Sub acest prag un cuvant e „nesigur” si se marcheaza.
+    /// Below this threshold, a word is "unsure" and gets marked.
     public static let threshold = 0.5
     public static let openMark = "\u{27E6}"  // ⟦
     public static let closeMark = "\u{27E7}" // ⟧
 
-    /// Ghilimele si paranteze de deschidere: raman in fata marcajului.
+    /// Opening quotes and brackets: they stay in front of the marker.
     static let leadingMarks: Set<Character> = ["(", "[", "{", "\u{201E}", "\u{201C}", "\u{00AB}", "\u{201A}", "\u{2018}", "\"", "'"]
-    /// Punctuatia de dupa cuvant: ramane dupa marcaj. Punctul din fata (.htaccess, .env) face parte din cuvant.
+    /// Punctuation after the word: it stays after the marker. A leading dot (.htaccess, .env) is part of the word.
     static let trailingMarks: Set<Character> = [".", ",", ";", ":", "!", "?", "\u{2026}", ")", "]", "}",
                                                 "\u{201D}", "\u{00BB}", "\u{2019}", "\"", "'"]
 
-    /// Grupeaza bucatile de token in cuvinte: un cuvant nou incepe la o bucata cu spatiu in fata, ca in textul final.
+    /// Groups the token pieces into words: a new word starts at a piece with a leading space, as in the final text.
     public static func words(from pieces: [TokenPiece]) -> [TranscribedWord] {
         var groups: [[TokenPiece]] = []
         for piece in pieces where !piece.text.isEmpty {
@@ -72,8 +72,8 @@ public enum WordConfidence {
         }
     }
 
-    /// Cuvintele mai multor segmente, in ordine. Segmentele se lipesc cu spatiu (ca textul final),
-    /// deci primul cuvant al fiecarui segment urmator primeste spatiu in fata daca nu are.
+    /// The words of several segments, in order. Segments are joined with a space (like the final text),
+    /// so the first word of each following segment gets a leading space if it has none.
     public static func joined(_ segments: [[TranscribedWord]]) -> [TranscribedWord] {
         var result: [TranscribedWord] = []
         for segment in segments {
@@ -88,7 +88,7 @@ public enum WordConfidence {
         return result
     }
 
-    /// exp(media log-probabilitatilor), rotunjit la 3 zecimale; fara punctuatia de la capete, daca mai ramane ceva.
+    /// exp(mean log-probability), rounded to 3 decimals; without the punctuation at the ends, if anything is left.
     static func probability(of group: [TokenPiece]) -> Double {
         var core = group[...]
         while core.count > 1, let first = core.first, isMark(first.text, in: leadingMarks) { core = core.dropFirst() }
@@ -104,8 +104,8 @@ public enum WordConfidence {
         return !trimmed.isEmpty && trimmed.allSatisfy(marks.contains)
     }
 
-    /// Textul cu cuvintele sub prag intre ⟦ si ⟧. Cuvintele nesigure alaturate intra in acelasi marcaj,
-    /// iar punctuatia de la capete ramane in afara lui: „am modificat ⟦hashtag accesul⟧.”
+    /// The text with the words below the threshold between ⟦ and ⟧. Adjacent unsure words share one marker,
+    /// and the punctuation at the ends stays outside it: "am modificat ⟦hashtag accesul⟧."
     public static func marked(_ words: [TranscribedWord], threshold: Double = threshold) -> String {
         var result = ""
         var run: [TranscribedWord] = []
@@ -140,17 +140,17 @@ public enum WordConfidence {
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Textul fara marcaje: plasa de siguranta daca modelul le lasa in raspuns.
+    /// The text without markers: a safety net in case the model leaves them in its response.
     public static func stripMarkers(_ text: String) -> String {
         text.replacingOccurrences(of: openMark, with: "").replacingOccurrences(of: closeMark, with: "")
     }
 
-    /// Cate cuvinte sunt sub prag.
+    /// How many words are below the threshold.
     public static func unsureCount(_ words: [TranscribedWord], threshold: Double = threshold) -> Int {
         words.filter { $0.probability < threshold }.count
     }
 
-    /// Cuvintele cu procentul lor, pentru CSV: "Am:98 facut:95 diploi:31".
+    /// The words with their percentages, for the CSV: "Am:98 facut:95 diploi:31".
     public static func summary(_ words: [TranscribedWord]) -> String {
         words.map { word in
             let text = word.text.trimmingCharacters(in: .whitespacesAndNewlines)

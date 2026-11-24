@@ -91,7 +91,7 @@ struct GeneralSettingsView: View {
                 Toggle("Restore the clipboard after pasting", isOn: $settings.restoreClipboard)
                     .disabled(settings.insertionMethod != .paste)
                 Toggle("Smart spacing (adds a space after existing text)", isOn: $settings.smartSpacing)
-                // Literele depind de limba dictarii; engleza n-are diacritice, deci optiunea dispare.
+                // The letters depend on the dictation language; English has no diacritics, so the option disappears.
                 if let label = settings.language.diacriticsLabel {
                     Toggle(label, isOn: $settings.useDiacritics)
                     Text(diacriticsHint)
@@ -147,7 +147,7 @@ struct GeneralSettingsView: View {
                     Link("Support hau-di (voluntary payment)", destination: AppInfo.voluntaryPaymentURL)
                 }
                 .font(.caption)
-                // Notele legale cerute de GPL v3 (sectiunea 5d) pentru programele cu interfata.
+                // The legal notices that GPL v3 (section 5d) requires from programs with a user interface.
                 Text("hau-di is free software: you can redistribute and modify it under the terms of the GNU General Public License v3. It comes with ABSOLUTELY NO WARRANTY. The cx.ro logo and the hau-di icons are not covered by the license.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -167,7 +167,7 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
     }
 
-    /// Ce inseamna „fara diacritice” in limba dictarii.
+    /// What "without diacritics" means in the dictation language.
     private var diacriticsHint: String {
         let language = settings.language
         let marks: String
@@ -243,7 +243,7 @@ struct TranscriptionSettingsView: View {
             }
 
             Section("Language") {
-                // Limba si „+ English” pe acelasi rand.
+                // Language and "+ English" on the same row.
                 LabeledContent("Dictation language") {
                     HStack(spacing: 12) {
                         Picker("Dictation language", selection: $settings.language) {

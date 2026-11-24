@@ -1,8 +1,8 @@
 import Foundation
 
-// Optiuni configurabile (portabile). Valorile brute sunt persistate in UserDefaults.
+// Configurable options (portable). The raw values are persisted in UserDefaults.
 
-/// Variante WhisperKit (folderul pe Hugging Face e `openai_whisper-<id>`).
+/// WhisperKit variants (the folder on Hugging Face is `openai_whisper-<id>`).
 public struct WhisperModelOption: Identifiable, Hashable, Sendable {
     public let id: String
     public let title: String
@@ -25,9 +25,10 @@ public struct WhisperModelOption: Identifiable, Hashable, Sendable {
     }
 }
 
-/// Limba dictarii: Whisper transcrie mereu in limba aleasa. Nu mai exista detectie automata: la o fraza cu multe
-/// cuvinte englezesti, detectia putea alege engleza, iar Whisper traducea in loc sa transcrie. Cuvintele spuse in
-/// engleza le scrie corect Claude, cand e bifat „+ engleza” (AppSettings.mixesEnglish, vezi CorrectionPrompt).
+/// The dictation language: Whisper always transcribes in the chosen language. Automatic detection was removed: on a
+/// sentence with many English words, detection could pick English, and Whisper translated instead of transcribing.
+/// Claude spells the words spoken in English correctly when "+ English" is checked (AppSettings.mixesEnglish, see
+/// CorrectionPrompt).
 public enum DictationLanguage: String, Codable, CaseIterable, Identifiable, Sendable {
     case romanian = "ro"
     case english = "en"
@@ -51,12 +52,12 @@ public enum DictationLanguage: String, Codable, CaseIterable, Identifiable, Send
         }
     }
 
-    /// Codul impus lui Whisper.
+    /// The language code forced on Whisper.
     public var code: String { rawValue }
 
-    /// Eticheta optiunii, cu numele folosit in engleza pentru semnele limbii: germana are umlaut-uri si ß (ß e o
-    /// litera, nu un semn diacritic); la franceza, spaniola, italiana si maghiara se spune „accents”. Spaniola: ñ e o
-    /// litera aparte si ramane si fara accente, deci nu apare aici. nil = limba nu are (engleza).
+    /// The option label, with the English name for the language's marks: German has umlauts and ß (ß is a letter,
+    /// not a diacritic); for French, Spanish, Italian and Hungarian the word is "accents". Spanish: ñ is a separate
+    /// letter and stays even without accents, so it does not appear here. nil = the language has none (English).
     public var diacriticsLabel: String? {
         switch self {
         case .romanian: return "With diacritics (ă â î ș ț)"
@@ -69,7 +70,7 @@ public enum DictationLanguage: String, Codable, CaseIterable, Identifiable, Send
         }
     }
 
-    /// Literele cu diacritice ale limbii, pentru eticheta optiunii; nil = limba nu are diacritice (engleza).
+    /// The language's letters with diacritics, for the option label; nil = the language has no diacritics (English).
     public var diacriticLetters: String? {
         switch self {
         case .romanian: return "ă â î ș ț"
@@ -82,7 +83,7 @@ public enum DictationLanguage: String, Codable, CaseIterable, Identifiable, Send
         }
     }
 
-    /// Numele in engleza, pentru prompt-ul de corectie.
+    /// The English name, for the correction prompt.
     public var englishName: String {
         switch self {
         case .romanian: return "Romanian"
@@ -95,9 +96,9 @@ public enum DictationLanguage: String, Codable, CaseIterable, Identifiable, Send
         }
     }
 
-    /// Setarea salvata de versiunile vechi -> limba + valoarea implicita a bifei „+ engleza”.
-    /// "ro+en" (romana sau engleza), "auto" si lipsa setarii devin romana cu engleza, ca implicitul de pana acum;
-    /// o limba individuala ramane, fara engleza.
+    /// The setting saved by old versions -> language + the default value of the "+ English" checkbox.
+    /// "ro+en" (Romanian or English), "auto" and a missing setting become Romanian with English, like the previous
+    /// default; a single language stays as it is, without English.
     public static func fromStored(_ raw: String?) -> (language: DictationLanguage, mixesEnglish: Bool) {
         if let language = DictationLanguage(rawValue: raw ?? "") {
             return (language, false)
@@ -106,7 +107,7 @@ public enum DictationLanguage: String, Codable, CaseIterable, Identifiable, Send
     }
 }
 
-/// Unde apare pastila de status: jos (deasupra Dock-ului) sau sus (sub bara de meniu).
+/// Where the status pill appears: at the bottom (above the Dock) or at the top (below the menu bar).
 public enum OverlayPosition: String, Codable, CaseIterable, Identifiable, Sendable {
     case bottom
     case top
@@ -159,25 +160,26 @@ public enum CorrectionLevel: String, Codable, CaseIterable, Identifiable, Sendab
     }
 }
 
-/// Modelele Claude. Lista vine din API (GET /v1/models, vezi ModelCatalog), iar preturile, fast mode si fallback-ul
-/// la refuz din lista de preturi (PriceList, price.json pe pay.cx.ro); aici raman valorile implicite si numele afisate.
+/// The Claude models. The list comes from the API (GET /v1/models, see ModelCatalog), and the prices, fast mode
+/// and the fallback on refusal come from the price list (PriceList, price.json on pay.cx.ro); the defaults and
+/// display names stay here.
 public enum ClaudeModels {
     public static let defaultModelID = "claude-opus-5-5"
 
-    /// Cel mai nou model cunoscut pe familii, folosit cat timp lista din API nu e inca incarcata.
+    /// The newest known model per family, used while the list from the API is not loaded yet.
     static let defaultByLine = ["opus": "claude-opus-5-5", "sonnet": "claude-sonnet-5-5", "haiku": "claude-haiku-5-5",
                                 "fable": "claude-fable-5-2"]
 
     public static func defaultModel(forLine line: String) -> String { defaultByLine[line] ?? defaultModelID }
 
-    /// ID-ul fara sufixul de data: "claude-opus-4-5-20251101" -> "claude-opus-4-5".
+    /// The ID without the date suffix: "claude-opus-4-5-20251101" -> "claude-opus-4-5".
     public static func baseID(_ id: String) -> String {
         let parts = id.split(separator: "-")
         guard parts.count > 1, let last = parts.last, last.count == 8, last.allSatisfy(\.isNumber) else { return id }
         return parts.dropLast().joined(separator: "-")
     }
 
-    /// Familia din ID: "claude-opus-4-5-20251101" -> "opus" (gol daca ID-ul are alta forma).
+    /// The family from the ID: "claude-opus-4-5-20251101" -> "opus" (empty if the ID has another shape).
     public static func line(of id: String) -> String {
         let parts = id.split(separator: "-").map(String.init)
         guard parts.count >= 2, parts[0] == "claude", !parts[1].allSatisfy(\.isNumber) else { return "" }
@@ -189,7 +191,7 @@ public enum ClaudeModels {
         line.isEmpty ? "Other" : line.prefix(1).uppercased() + line.dropFirst()
     }
 
-    /// "claude-opus-4-5-20251101" -> "Claude Opus 4.5"; ID-urile cu alta forma raman ca atare.
+    /// "claude-opus-4-5-20251101" -> "Claude Opus 4.5"; IDs with any other shape stay as they are.
     public static func displayName(for id: String) -> String {
         let parts = baseID(id).split(separator: "-").map(String.init)
         guard parts.count >= 3, parts[0] == "claude", !parts[1].allSatisfy(\.isNumber) else { return id }
@@ -198,7 +200,7 @@ public enum ClaudeModels {
         return "Claude " + lineTitle(parts[1]) + " " + numbers.joined(separator: ".")
     }
 
-    /// Textul unei selectii din setari: "latest:opus" -> "cel mai nou Opus".
+    /// The text for a selection in the settings: "latest:opus" -> "Latest Opus".
     public static func selectionTitle(_ selection: String) -> String {
         if selection.hasPrefix(ModelCatalog.latestPrefix) {
             return "Latest " + lineTitle(String(selection.dropFirst(ModelCatalog.latestPrefix.count)))
@@ -207,10 +209,10 @@ public enum ClaudeModels {
     }
 }
 
-/// Cat asteptam corectia Claude, in functie de lungimea dictarii (secunde de audio).
-/// Peste timpul asta se insereaza transcrierea bruta.
+/// How long we wait for the Claude correction, depending on the dictation length (seconds of audio).
+/// Past this time, the raw transcript is inserted.
 public struct CorrectionTimeouts: Equatable, Sendable {
-    /// Pana la (inclusiv) atatea secunde de audio, dictarea e scurta.
+    /// Up to (and including) this many seconds of audio, the dictation is short.
     public var longDictationThreshold: TimeInterval
     public var short: TimeInterval
     public var long: TimeInterval
@@ -221,17 +223,17 @@ public struct CorrectionTimeouts: Equatable, Sendable {
         self.long = long
     }
 
-    /// Implicit: pana la 5 s de audio se asteapta 5 s, peste se asteapta 20 s (pana la 23.11.2026: 2 s si 15 s).
+    /// Default: up to 5 s of audio we wait 5 s, above that we wait 20 s (until 2026-11-23: 2 s and 15 s).
     public static let defaults = CorrectionTimeouts(longDictationThreshold: 5, short: 5, long: 20)
 
-    /// Fara durata (ex: testul din setari) folosim timpul pentru dictare lunga.
+    /// Without a duration (e.g. the test in the settings) we use the long-dictation timeout.
     public func timeout(forAudio duration: TimeInterval?) -> TimeInterval {
         guard let duration else { return long }
         return duration <= longDictationThreshold ? short : long
     }
 }
 
-/// Nivelul de efort (`output_config.effort`). Ce niveluri are fiecare model spune /v1/models (`capabilities.effort`).
+/// The effort level (`output_config.effort`). /v1/models says which levels each model has (`capabilities.effort`).
 public enum EffortLevel: String, Codable, CaseIterable, Identifiable, Sendable {
     case low
     case medium
@@ -251,11 +253,11 @@ public enum EffortLevel: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Pozitia in ordinea low < medium < high < xhigh < max.
+    /// The position in the order low < medium < high < xhigh < max.
     public var rank: Int { Self.allCases.firstIndex(of: self) ?? 0 }
 }
 
-/// Fraza rostita -> text inserat (ex: "semnatura mea" -> "Cu bine, Ana").
+/// Spoken phrase -> inserted text (e.g. "my signature" -> "Best, Ana").
 public struct Snippet: Codable, Hashable, Identifiable, Sendable {
     public var id: UUID
     public var trigger: String

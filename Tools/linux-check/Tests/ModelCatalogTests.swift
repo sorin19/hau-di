@@ -4,7 +4,7 @@ import FoundationNetworking
 #endif
 @testable import HauDiCore
 
-/// Raspunsul real GET /v1/models (noiembrie 2026), scurtat la 6 modele cu situatii diferite.
+/// The real GET /v1/models response (November 2026), trimmed to 6 models covering different cases.
 private let modelsSample = #"""
 {"data":[
  {"type":"model","id":"claude-fable-5-2","display_name":"Claude Fable 5.2","created_at":"2026-11-09T18:30:00Z","line":"fable",
@@ -81,7 +81,7 @@ final class ModelCatalogTests: XCTestCase {
     func testModelWithoutCapabilities() throws {
         let json = #"{"data":[{"id":"claude-opus-6","created_at":"2027-01-01T00:00:00Z"}],"has_more":false}"#
         let model = try XCTUnwrap(ModelCatalog.parsePage(Data(json.utf8)).models.first)
-        // Fara `capabilities.effort` nu trimitem efort (un nivel neacceptat ar da 400).
+        // Without `capabilities.effort` we send no effort (an unsupported level would return a 400).
         XCTAssertEqual(model.efforts, [])
         XCTAssertTrue(model.structuredOutputs)
         XCTAssertEqual(model.line, "opus")
@@ -103,22 +103,22 @@ final class ModelCatalogTests: XCTestCase {
         let now = date("2026-11-23T12:00:00Z")
         XCTAssertEqual(ModelCatalog.resolve("latest:opus", in: list, now: now), "claude-opus-5-5")
         XCTAssertEqual(ModelCatalog.resolve("latest:fable", in: list, now: now), "claude-fable-5-2")
-        // Cel mai nou activ: Sonnet 4.5 e depreciat, deci Sonnet 4.6.
+        // The newest active one: Sonnet 4.5 is deprecated, so Sonnet 4.6.
         XCTAssertEqual(ModelCatalog.resolve("latest:sonnet", in: list, now: now), "claude-sonnet-4-6")
         XCTAssertEqual(ModelCatalog.resolve("latest:sonnet", in: list.filter { $0.id != "claude-sonnet-4-6" }, now: now),
                        "claude-sonnet-4-5-20250929")
         XCTAssertEqual(ModelCatalog.resolve("claude-opus-4-5-20251101", in: list, now: now), "claude-opus-4-5-20251101")
-        // Alias fara data pentru un model listat cu data: ramane alias-ul (API-ul il accepta).
+        // An alias without a date for a model listed with a date: the alias stays (the API accepts it).
         XCTAssertEqual(ModelCatalog.resolve("claude-opus-4-5", in: list, now: now), "claude-opus-4-5")
-        // Depreciat, dar inca servit: ramane cel ales.
+        // Deprecated but still served: the chosen one stays.
         XCTAssertEqual(ModelCatalog.resolve("claude-sonnet-4-5-20250929", in: list, now: now), "claude-sonnet-4-5-20250929")
-        // Dupa data retragerii (lista din cache inca il are): cel mai nou Sonnet.
+        // After the retirement date (the cached list still has it): the newest Sonnet.
         XCTAssertEqual(ModelCatalog.resolve("claude-sonnet-4-5-20250929", in: list, now: date("2026-12-01T00:00:00Z")),
                        "claude-sonnet-4-6")
-        // Scos din API: cel mai nou din aceeasi familie; familie disparuta: cel mai nou Opus.
+        // Removed from the API: the newest in the same family; family gone: the newest Opus.
         XCTAssertEqual(ModelCatalog.resolve("claude-haiku-3-5", in: list, now: now), "claude-haiku-4-5-20251001")
         XCTAssertEqual(ModelCatalog.resolve("claude-mythos-5-2", in: list, now: now), "claude-opus-5-5")
-        // Lista inca neincarcata: ID-ul ales, sau ultimul model cunoscut al familiei.
+        // List not loaded yet: the chosen ID, or the last known model of the family.
         XCTAssertEqual(ModelCatalog.resolve("claude-sonnet-5-5", in: [], now: now), "claude-sonnet-5-5")
         XCTAssertEqual(ModelCatalog.resolve("latest:haiku", in: [], now: now), "claude-haiku-5-5")
         XCTAssertEqual(ModelCatalog.resolve("", in: [], now: now), "claude-opus-5-5")
@@ -134,9 +134,9 @@ final class ModelCatalogTests: XCTestCase {
         XCTAssertEqual(ModelCatalog.effort(.xhigh, for: sonnet46), .high)
         XCTAssertEqual(ModelCatalog.effort(.max, for: sonnet46), .max)
         XCTAssertNil(ModelCatalog.effort(.low, for: ModelCatalog.info("claude-haiku-4-5", in: list)))
-        // Model necunoscut (lista neincarcata): nivelul ales.
+        // Unknown model (list not loaded): the chosen level.
         XCTAssertEqual(ModelCatalog.effort(.xhigh, for: nil), .xhigh)
-        // Doar niveluri mai mari decat cel ales: cel mai mic dintre ele.
+        // Only levels higher than the chosen one: the lowest of them.
         XCTAssertEqual(ModelCatalog.effort(.low, for: ClaudeModelInfo(id: "claude-test-1", efforts: [.high, .max])), .high)
     }
 
@@ -145,7 +145,7 @@ final class ModelCatalogTests: XCTestCase {
         XCTAssertEqual(groups.map(\.line), ["opus", "sonnet", "haiku", "fable"])
         XCTAssertEqual(groups[0].models.map(\.id), ["claude-opus-5-5", "claude-opus-4-5-20251101"])
         XCTAssertEqual(groups[1].models.map(\.id), ["claude-sonnet-4-6", "claude-sonnet-4-5-20250929"])
-        // Familie noua, necunoscuta: la final.
+        // A new, unknown family: at the end.
         let extra = ClaudeModelInfo(id: "claude-zeta-1", createdAt: "2027-01-01T00:00:00Z")
         XCTAssertEqual(ModelCatalog.grouped(try sampleModels() + [extra]).last?.line, "zeta")
     }
@@ -156,7 +156,7 @@ final class ModelCatalogTests: XCTestCase {
         XCTAssertEqual(shown.map(\.id), ["claude-opus-5-5", "claude-haiku-4-5-20251001"])
         XCTAssertEqual(ModelCatalog.resolve("latest:sonnet", in: shown), "claude-sonnet-5-5")
         XCTAssertEqual(ModelCatalog.resolve("claude-opus-4-5-20251101", in: shown), "claude-opus-5-5")
-        // Copia din aplicatie acopera toate modelele din raspunsul real /v1/models.
+        // The copy bundled with the app covers all the models in the real /v1/models response.
         XCTAssertEqual(ModelCatalog.priced(try sampleModels(), in: .bundled).count, 6)
     }
 
@@ -179,13 +179,13 @@ final class ModelCatalogTests: XCTestCase {
         XCTAssertTrue(ClaudeOptions(model: "claude-fable-5-2", fastMode: true).fastMode)
         XCTAssertFalse(ClaudeOptions(model: "claude-opus-5-5", fastMode: false).fastMode)
         XCTAssertFalse(ClaudeOptions(model: "claude-haiku-5-5", fastMode: true).fastMode)
-        // Opus 4.8: fast mode doar ca previzualizare, cu acces cerut separat.
+        // Opus 4.8: fast mode only as a preview, with access requested separately.
         XCTAssertFalse(ClaudeOptions(model: "claude-opus-4-8", fastMode: true).fastMode)
         XCTAssertFalse(ClaudeOptions(model: "claude-opus-5-5", fastMode: true, rejectedFeatures: ["speed"]).fastMode)
-        // Model fara pret in lista: fara fast mode si fara fallback.
+        // A model without a price in the list: no fast mode and no fallback.
         XCTAssertFalse(ClaudeOptions(model: "claude-opus-6", fastMode: true).fastMode)
         XCTAssertFalse(ClaudeOptions(model: "claude-opus-6").serverSideFallback)
-        // ... pana apare in lista de preturi.
+        // ... until it shows up in the price list.
         let prices = PriceList(models: [.init(id: "claude-opus-6", input: 4, output: 20, fast: true, fallbacks: true)])
         XCTAssertTrue(ClaudeOptions(model: "claude-opus-6", fastMode: true, prices: prices).fastMode)
         XCTAssertTrue(ClaudeOptions(model: "claude-opus-6", prices: prices).serverSideFallback)
@@ -200,7 +200,7 @@ final class ModelCatalogTests: XCTestCase {
         let transcript = String(repeating: "a", count: 2_000)
         let (body, betas) = ClaudeCorrector.buildRequest(transcript: transcript, context: nil, config: CorrectionConfig(),
                                                          options: options, useFastMode: true)
-        // 2048 + 2 x 2000 = 6048, dar modelul are plafonul 3000 (in realitate 64000).
+        // 2048 + 2 x 2000 = 6048, but the model's cap is 3000 (64000 in reality).
         XCTAssertEqual(body.maxTokens, 3_000)
         XCTAssertNil(body.speed)
         XCTAssertNil(body.fallbacks)
@@ -282,11 +282,11 @@ final class ModelLearningTests: XCTestCase {
             _ = try await ClaudeCorrector(client: makeClient()).correct(
                 transcript: "ok", context: nil, config: CorrectionConfig(),
                 options: ClaudeOptions(model: "claude-opus-5-5", fastMode: true, timeout: 10), apiKey: "k")
-            XCTFail("trebuia sa arunce")
+            XCTFail("should have thrown")
         } catch let error as AnthropicError {
             XCTAssertEqual(error, .http(status: 400, type: "invalid_request_error", message: "prompt is too long"))
         }
-        // Cu fast, fara fast, fara fallback: apoi renuntam.
+        // With fast, without fast, without fallback: then we give up.
         XCTAssertEqual(calls, 3)
     }
 
@@ -314,7 +314,7 @@ final class ModelLearningTests: XCTestCase {
         }
         do {
             _ = try await makeClient().listModels(apiKey: "bad")
-            XCTFail("trebuia sa arunce")
+            XCTFail("should have thrown")
         } catch let error as AnthropicError {
             XCTAssertEqual(error.errorDescription, "Invalid API key (401).")
         }
@@ -332,9 +332,9 @@ final class PriceListTests: XCTestCase {
         XCTAssertEqual(list.entry(for: "claude-opus-4-8")?.supportsFastMode, false)
         XCTAssertEqual(list.entry(for: "claude-sonnet-5-5")?.supportsServerSideFallback, true)
         XCTAssertEqual(list.entry(for: "claude-haiku-5-5")?.supportsServerSideFallback, false)
-        // Fast mode: dublu, cu multiplicatorii de cache peste ($8 / $40 pe Opus 5.5).
+        // Fast mode: double, with the cache multipliers on top ($8 / $40 on Opus 5.5).
         XCTAssertEqual(list.pricing(for: "claude-opus-5-5", fast: true), ModelPricing(input: 8, cacheWrite5m: 10, cacheRead: 0.4, output: 40))
-        // Haiku 5.5: alt pret peste 100.000 de tokeni de prompt.
+        // Haiku 5.5: a different price above 100,000 prompt tokens.
         XCTAssertEqual(list.pricing(for: "claude-haiku-5-5", promptTokens: 100_000)?.input, 0.10)
         XCTAssertEqual(list.pricing(for: "claude-haiku-5-5", promptTokens: 100_001)?.output, 2.50)
     }
@@ -377,7 +377,7 @@ final class PriceListTests: XCTestCase {
         XCTAssertEqual(list.stamp, "2026-11-24 10:15:00")
         XCTAssertNil(PriceList.bundled.modified)
         XCTAssertEqual(PriceList.bundled.stamp, "2026-11-23")
-        // Salvata pe server in aceeasi zi cu copia din aplicatie: lista de pe server castiga.
+        // Saved on the server on the same day as the bundled copy: the list from the server wins.
         XCTAssertGreaterThanOrEqual(PriceList(updated: "2026-11-23", modified: "2026-11-23 09:00:00", models: []).stamp,
                                     PriceList.bundled.stamp)
         XCTAssertEqual(ModelCatalog.displayDateTime(list.stamp), "2026-11-24 10:15")

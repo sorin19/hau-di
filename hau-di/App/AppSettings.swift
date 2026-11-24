@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// Setarile aplicatiei, persistate in UserDefaults. Cheia API sta separat, in Keychain.
+/// The app's settings, persisted in UserDefaults. The API key is kept separately, in the Keychain.
 @MainActor
 final class AppSettings: ObservableObject {
     private let defaults: UserDefaults
@@ -41,23 +41,23 @@ final class AppSettings: ObservableObject {
         static let snippets = "snippets"
         static let historyEnabled = "historyEnabled"
         static let onboardingDone = "onboardingDone"
-        /// Setari retrase: motorul Parakeet (scos) si timpul limita unic (inlocuit de scurt / lung).
+        /// Retired settings: the Parakeet engine (removed) and the single timeout (replaced by short / long).
         static let retired = ["engine", "parakeetModel", "correctionTimeout", "effortResetToLowV1"]
     }
 
-    // Combinatie de taste
+    // Key combination
     @Published var hotkey: Hotkey { didSet { saveCodable(hotkey, Key.hotkey) } }
     @Published var handsFreeEnabled: Bool { didSet { defaults.set(handsFreeEnabled, forKey: Key.handsFree) } }
 
-    // Transcriere
+    // Transcription
     @Published var whisperModel: String { didSet { defaults.set(whisperModel, forKey: Key.whisperModel) } }
     @Published var language: DictationLanguage { didSet { defaults.set(language.rawValue, forKey: Key.language) } }
-    /// „+ engleza”: in dictare apar si cuvinte in engleza (romgleza, hungleza); Claude le scrie corect, in engleza.
+    /// "+ English": dictation mixes in English words (Romglish, Hunglish); Claude writes them correctly, in English.
     @Published var mixesEnglish: Bool { didSet { defaults.set(mixesEnglish, forKey: Key.mixesEnglish) } }
     @Published var whisperDictionaryHint: Bool { didSet { defaults.set(whisperDictionaryHint, forKey: Key.whisperDictionaryHint) } }
     @Published var microphoneUID: String? { didSet { defaults.set(microphoneUID, forKey: Key.microphoneUID) } }
 
-    // Inserare si feedback
+    // Insertion and feedback
     @Published var insertionMethod: InsertionMethod { didSet { defaults.set(insertionMethod.rawValue, forKey: Key.insertionMethod) } }
     @Published var restoreClipboard: Bool { didSet { defaults.set(restoreClipboard, forKey: Key.restoreClipboard) } }
     @Published var smartSpacing: Bool { didSet { defaults.set(smartSpacing, forKey: Key.smartSpacing) } }
@@ -65,44 +65,44 @@ final class AppSettings: ObservableObject {
     @Published var showOverlay: Bool { didSet { defaults.set(showOverlay, forKey: Key.showOverlay) } }
     @Published var overlayPosition: OverlayPosition { didSet { defaults.set(overlayPosition.rawValue, forKey: Key.overlayPosition) } }
 
-    /// ID-ul instalarii: UUID v7 (momentul generarii + biti aleatori), fara legatura cu persoana sau cu Mac-ul.
-    /// Se trimite doar la citirea listei de preturi (o data pe saptamana), ca autorul sa vada cate instalari
-    /// folosesc aplicatia. Un ID mai vechi, v4, se inlocuieste o data cu unul v7.
+    /// The install ID: a UUID v7 (generation time + random bits), not linked to the person or to the Mac.
+    /// It is sent only when fetching the price list (once a week), so the author can see how many installs
+    /// use the app. An older v4 ID is replaced once with a v7 one.
     let installID: String
 
-    // Corectie AI (Claude)
+    // AI correction (Claude)
     @Published var correctionEnabled: Bool { didSet { defaults.set(correctionEnabled, forKey: Key.correctionEnabled) } }
-    /// ID-ul modelului ales din lista API ("claude-opus-5-5") sau "latest:<familie>" (cel mai nou din familie).
-    /// Valorile salvate de versiunile vechi (enum-ul fix) erau deja ID-uri, deci raman valide.
+    /// ID of the model chosen from the API list ("claude-opus-5-5") or "latest:<family>" (the newest in the family).
+    /// Values saved by old versions (the fixed enum) were already IDs, so they stay valid.
     @Published var claudeModel: String { didSet { defaults.set(claudeModel, forKey: Key.claudeModel) } }
     @Published var correctionLevel: CorrectionLevel { didSet { defaults.set(correctionLevel.rawValue, forKey: Key.correctionLevel) } }
-    /// Efortul dorit; daca modelul nu are nivelul, se trimite cel mai apropiat mai mic (ModelCatalog.effort).
+    /// The desired effort; if the model doesn't have that level, the nearest lower one is sent (ModelCatalog.effort).
     @Published var effort: EffortLevel { didSet { defaults.set(effort.rawValue, forKey: Key.effort) } }
     @Published var fastMode: Bool { didSet { defaults.set(fastMode, forKey: Key.fastMode) } }
-    /// Dictarile pana la atatea secunde de audio sunt scurte; peste, lungi.
+    /// Dictations up to this many seconds of audio are short; beyond that, long.
     @Published var longDictationThreshold: Double { didSet { defaults.set(longDictationThreshold, forKey: Key.longDictationThreshold) } }
-    /// Cat asteptam corectia Claude la o dictare scurta, respectiv lunga.
+    /// How long we wait for the Claude correction on a short and on a long dictation, respectively.
     @Published var shortCorrectionTimeout: Double { didSet { defaults.set(shortCorrectionTimeout, forKey: Key.shortCorrectionTimeout) } }
     @Published var longCorrectionTimeout: Double { didSet { defaults.set(longCorrectionTimeout, forKey: Key.longCorrectionTimeout) } }
-    /// Bugetul lunar pentru corecturile Claude (implicit pornit, 20 $): la 80% avertisment, la 100% corectia se opreste
-    /// pana la luna urmatoare (BudgetTracker).
+    /// The monthly budget for Claude corrections (on by default, $20): a warning at 80%; at 100% correction stops
+    /// until the next month (BudgetTracker).
     @Published var monthlyBudgetEnabled: Bool { didSet { defaults.set(monthlyBudgetEnabled, forKey: Key.monthlyBudgetEnabled) } }
     @Published var monthlyBudgetUSD: Double { didSet { defaults.set(monthlyBudgetUSD, forKey: Key.monthlyBudgetUSD) } }
     @Published var sendAppContext: Bool { didSet { defaults.set(sendAppContext, forKey: Key.sendAppContext) } }
     @Published var sendFieldText: Bool { didSet { defaults.set(sendFieldText, forKey: Key.sendFieldText) } }
     @Published var customInstructions: String { didSet { defaults.set(customInstructions, forKey: Key.customInstructions) } }
-    /// false = textul se insereaza fara diacritice (si cu, si fara corectia Claude).
+    /// false = the text is inserted without diacritics (both with and without the Claude correction).
     @Published var useDiacritics: Bool { didSet { defaults.set(useDiacritics, forKey: Key.useDiacritics) } }
 
-    // Dictionar si snippet-uri
+    // Dictionary and snippets
     @Published var dictionary: [String] { didSet { defaults.set(dictionary, forKey: Key.dictionary) } }
-    /// Sugestiile de dictionar ascunse cu ×, dupa cheie (DictionarySuggestions.key).
+    /// Dictionary suggestions hidden with ×, by key (DictionarySuggestions.key).
     @Published var ignoredSuggestions: [String] {
         didSet { defaults.set(ignoredSuggestions, forKey: Key.ignoredSuggestions) }
     }
     @Published var snippets: [Snippet] { didSet { saveCodable(snippets, Key.snippets) } }
 
-    // Altele
+    // Other
     @Published var historyEnabled: Bool { didSet { defaults.set(historyEnabled, forKey: Key.historyEnabled) } }
     @Published var onboardingDone: Bool { didSet { defaults.set(onboardingDone, forKey: Key.onboardingDone) } }
 
@@ -126,7 +126,7 @@ final class AppSettings: ObservableObject {
         handsFreeEnabled = bool(Key.handsFree, true)
 
         whisperModel = defaults.string(forKey: Key.whisperModel) ?? WhisperModelOption.defaultID
-        // Versiunile vechi aveau si "ro+en" / "auto"; devin romana + „+ engleza” si se salveaza o data in forma noua.
+        // Old versions also had "ro+en" / "auto": they become Romanian + "+ English", saved once in the new form.
         let storedLanguage = DictationLanguage.fromStored(defaults.string(forKey: Key.language))
         let storedMixesEnglish = bool(Key.mixesEnglish, storedLanguage.mixesEnglish)
         language = storedLanguage.language
@@ -154,8 +154,8 @@ final class AppSettings: ObservableObject {
         correctionEnabled = bool(Key.correctionEnabled, true)
         claudeModel = defaults.string(forKey: Key.claudeModel).flatMap { $0.isEmpty ? nil : $0 } ?? ClaudeModels.defaultModelID
         correctionLevel = CorrectionLevel(rawValue: defaults.string(forKey: Key.correctionLevel) ?? "") ?? .standard
-        // Implicit Mediu (testul pe dictari reale din 24.11.2026: Opus 5.5 pe Mediu are de ~3 ori mai putine erori grave
-        // decat pe Scazut). Ce a ales deja utilizatorul ramane neatins.
+        // Default Medium (the test on real dictations from 24.11.2026: Opus 5.5 on Medium makes ~3 times fewer serious
+        // errors than on Low). Whatever the user has already chosen stays untouched.
         effort = EffortLevel(rawValue: defaults.string(forKey: Key.effort) ?? "") ?? .medium
         fastMode = bool(Key.fastMode, false)
         let timeouts = CorrectionTimeouts.defaults
@@ -163,7 +163,7 @@ final class AppSettings: ObservableObject {
         var shortTimeout = seconds(Key.shortCorrectionTimeout, timeouts.short)
         var longTimeout = seconds(Key.longCorrectionTimeout, timeouts.long)
         if !defaults.bool(forKey: Key.correctionTimeoutsV2) {
-            // Implicitele vechi salvate (2 s si 15 s) trec o singura data pe cele noi; alte valori alese raman.
+            // Saved old defaults (2 s and 15 s) move to the new ones, only once; other chosen values stay.
             if shortTimeout == 2 {
                 shortTimeout = timeouts.short
                 defaults.set(shortTimeout, forKey: Key.shortCorrectionTimeout)
@@ -197,17 +197,17 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    // MARK: - Valori derivate
+    // MARK: - Derived values
 
     var correctionConfig: CorrectionConfig {
-        // Engleza n-are diacritice: optiunea nu se aplica (si e ascunsa in interfata).
+        // English has no diacritics: the option doesn't apply (and is hidden in the UI).
         CorrectionConfig(level: correctionLevel, dictionary: dictionary, snippets: snippets,
                          customInstructions: customInstructions,
                          useDiacritics: useDiacritics || language.diacriticLetters == nil,
                          language: language, mixesEnglish: mixesEnglish)
     }
 
-    /// Limita lunara in dolari; nil = fara limita.
+    /// The monthly limit in dollars; nil = no limit.
     var monthlyBudget: Double? { monthlyBudgetEnabled ? monthlyBudgetUSD : nil }
 
     var correctionTimeouts: CorrectionTimeouts {
@@ -215,8 +215,8 @@ final class AppSettings: ObservableObject {
                            long: longCorrectionTimeout)
     }
 
-    /// Optiunile de apel: modelul ales (rezolvat pe lista din API), efortul acceptat de el, fast mode si
-    /// fallback doar unde se pot. `audioDuration` alege timpul limita (scurt / lung); nil = dictare lunga.
+    /// The call options: the chosen model (resolved against the API list), the effort it accepts, fast mode and
+    /// fallback only where possible. `audioDuration` picks the timeout (short / long); nil = long dictation.
     func claudeOptions(audioDuration: TimeInterval?, models: ModelCatalogStore) -> ClaudeOptions {
         let id = models.resolvedID(for: claudeModel)
         let info = models.info(for: id)
@@ -225,7 +225,7 @@ final class AppSettings: ObservableObject {
                              prices: models.prices, timeout: correctionTimeouts.timeout(forAudio: audioDuration))
     }
 
-    /// Termenii din dictionar trimisi ca prompt lui Whisper (daca e activat).
+    /// The dictionary terms sent to Whisper as a prompt (if enabled).
     var whisperVocabulary: [String] {
         guard whisperDictionaryHint else { return [] }
         return dictionary.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }

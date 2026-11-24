@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-// Desenele din logo-ul cx.ro: forma din liniute si rombul de status.
-// Geometria (portabila, testata pe Linux) e in Core/LogoGeometry.swift.
+// Drawings from the cx.ro logo: the shape made of stripes and the status rhombus.
+// The geometry (portable, tested on Linux) is in Core/LogoGeometry.swift.
 
 extension BrandTone {
     func nsColor(onDark: Bool) -> NSColor {
@@ -10,7 +10,7 @@ extension BrandTone {
         return NSColor(srgbRed: components.r, green: components.g, blue: components.b, alpha: 1)
     }
 
-    /// NSColor care isi alege singur varianta dupa tema in care e desenat.
+    /// An NSColor that picks its own variant based on the theme it is drawn in.
     var adaptiveNSColor: NSColor {
         NSColor(name: nil) { appearance in
             nsColor(onDark: appearance.isDark)
@@ -21,7 +21,7 @@ extension BrandTone {
         Color(nsColor: nsColor(onDark: onDark))
     }
 
-    /// Se adapteaza la tema locului unde e desenata (deschis: +16% luminozitate, ca in logo).
+    /// Adapts to the theme of the place where it is drawn (light theme: +16% lightness, as in the logo).
     var adaptiveColor: Color {
         Color(nsColor: adaptiveNSColor)
     }
@@ -32,7 +32,7 @@ extension NSAppearance {
 }
 
 enum BrandArt {
-    /// Forma plina a logo-ului (se umple cu regula even-odd). `scale` = puncte per unitate de logo.
+    /// The filled shape of the logo (filled with the even-odd rule). `scale` = points per logo unit.
     static func logoPath(center: CGPoint, scale: CGFloat) -> CGPath {
         let path = CGMutablePath()
         for sector in [LogoGeometry.outer, LogoGeometry.hole] {
@@ -41,7 +41,7 @@ enum BrandArt {
                 let transform = CGAffineTransform(translationX: center.x, y: center.y)
                     .scaledBy(x: side * CGFloat(sector.rx) * scale, y: CGFloat(sector.ry) * scale)
                 path.move(to: center)
-                // Arcul trece prin unghiul 0 (spre exterior); linia din centru si inchiderea formeaza bratele.
+                // The arc passes through angle 0 (outward); the line from the center and the closing form the arms.
                 path.addArc(center: .zero, radius: 1, startAngle: -angle, endAngle: angle, clockwise: false,
                             transform: transform)
                 path.closeSubpath()
@@ -50,7 +50,7 @@ enum BrandArt {
         return path
     }
 
-    /// Rombul din „cx.ro”, cu inaltimea data (y in jos, ca in SVG).
+    /// The rhombus from "cx.ro", with the given height (y pointing down, as in SVG).
     static func rhombusPath(center: CGPoint, height: CGFloat) -> CGPath {
         func point(_ x: Double, _ y: Double) -> CGPoint {
             CGPoint(x: center.x + CGFloat(x) * height, y: center.y + CGFloat(y) * height)
@@ -64,15 +64,15 @@ enum BrandArt {
         return path
     }
 
-    /// Cel mai mare romb care incape in dreptunghi, centrat.
+    /// The largest rhombus that fits in the rectangle, centered.
     static func rhombusPath(in rect: CGRect) -> CGPath {
         let height = min(rect.height, rect.width / CGFloat(LogoGeometry.rhombusAspect))
         return rhombusPath(center: CGPoint(x: rect.midX, y: rect.midY), height: height)
     }
 
-    /// Iconul din bara de meniu: liniutele logo-ului in culoarea barii si, cand hau-di lucreaza, rombul din mijloc
-    /// in culoarea starii (`rhombusColor` nil = repaus: doar forma, fara romb).
-    /// Contextul trebuie sa fie intors (y in jos), cu originea in coltul iconului.
+    /// The menu bar icon: the logo's stripes in the menu bar color and, while hau-di is working, the middle rhombus
+    /// in the state color (`rhombusColor` nil = idle: only the shape, no rhombus).
+    /// The context must be flipped (y pointing down), with the origin at the icon's corner.
     static func drawMenuBarLogo(in context: CGContext, stripeColor: NSColor, rhombusColor: NSColor?) {
         let layout = LogoGeometry.MenuBar.self
         let center = CGPoint(x: layout.center.x, y: layout.center.y)
@@ -83,7 +83,7 @@ enum BrandArt {
         context.addPath(logoPath(center: center, scale: CGFloat(layout.scale)))
         context.clip(using: .evenOdd)
         if rhombusColor != nil {
-            // Golul din jurul rombului: tot iconul minus rombul marit.
+            // The gap around the rhombus: the whole icon minus the enlarged rhombus.
             context.addRect(bounds)
             context.addPath(rhombusPath(center: center, height: rhombusHeight * CGFloat(layout.haloScale)))
             context.clip(using: .evenOdd)
@@ -101,7 +101,7 @@ enum BrandArt {
     }
 }
 
-// MARK: - Rombul de status
+// MARK: - Status rhombus
 
 enum StatusGlyph {
     case check, exclamation, info
@@ -113,7 +113,7 @@ struct RhombusShape: Shape {
     }
 }
 
-/// Semnul din romb (bifa, !, i), desenat la scara rombului.
+/// The sign inside the rhombus (checkmark, !, i), drawn at the rhombus's scale.
 struct StatusGlyphShape: Shape {
     let glyph: StatusGlyph
 
@@ -151,7 +151,7 @@ struct StatusGlyphShape: Shape {
     }
 }
 
-/// Rombul din „cx.ro” folosit ca icon de status (pastila, setari, meniu).
+/// The rhombus from "cx.ro" used as a status icon (pill, settings, menu).
 struct StatusDiamond: View {
     var color: Color
     var glyph: StatusGlyph?
@@ -179,7 +179,7 @@ struct StatusDiamond: View {
     }
 }
 
-/// Starea unei setari: gri = nesetat, verde = setat, rosu = eroare.
+/// The state of a setting: gray = not set, green = set, red = error.
 enum SetupStatus {
     case notSet, ok, error
 
@@ -198,7 +198,7 @@ enum SetupStatus {
 
 struct SetupStatusIcon: View {
     let status: SetupStatus
-    /// Pulseaza cat timp se lucreaza (ex: modelul se descarca).
+    /// Pulses while work is in progress (e.g. the model is downloading).
     var busy = false
     var size: CGFloat = 16
 

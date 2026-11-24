@@ -11,7 +11,7 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        // Meniul de sus e acelasi control segmentat ca intervalele din Istoric: sectiunea aleasa are fundal albastru.
+        // The top menu is the same segmented control as the History ranges: the selected section has a blue background.
         VStack(spacing: 12) {
             Picker("Section", selection: $navigation.tab) {
                 ForEach(SettingsTab.allCases) { tab in
@@ -42,7 +42,7 @@ struct SettingsView: View {
     }
 }
 
-/// Rand cu rombul de stare + actiune (folosit in onboarding): gri = nesetat, verde = setat, rosu = eroare.
+/// A row with the status rhombus + an action (used in onboarding): gray = not set, green = set, red = error.
 struct StatusRow<Accessory: View>: View {
     let status: SetupStatus
     var busy = false
@@ -210,7 +210,7 @@ struct WelcomeView: View {
         }
     }
 
-    /// Rosu daca Accessibility e acordat, dar ascultarea tastelor tot nu a pornit.
+    /// Red if Accessibility is granted but the key listener has still not started.
     private var hotkeyStatus: SetupStatus {
         if hotkeyUI.monitorActive { return .ok }
         return permissions.accessibility ? .error : .notSet

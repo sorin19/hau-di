@@ -1,10 +1,10 @@
 import Foundation
 import IOKit.pwr_mgt
 
-/// Cat timp se inregistreaza, Mac-ul nu porneste screensaver-ul si nu stinge ecranul (ca un player video).
-/// O tasta tinuta apasata nu conteaza ca activitate: fara asta, dupa intervalul din setarile sistemului
-/// screensaver-ul pornea in mijlocul dictarii. Setarile utilizatorului raman neatinse; cand se elibereaza tastele
-/// (un eveniment de tastatura), numaratoarea pentru screensaver o ia de la zero, ca dupa orice apasare.
+/// While recording, the Mac doesn't start the screensaver or turn off the display (like a video player).
+/// A key held down doesn't count as activity: without this, after the interval set in the system settings
+/// the screensaver would start in the middle of the dictation. The user's settings stay untouched; when the keys are
+/// released (a keyboard event), the screensaver countdown starts over from zero, as after any key press.
 @MainActor
 final class IdleSleepGuard {
     private var assertion: IOPMAssertionID = 0

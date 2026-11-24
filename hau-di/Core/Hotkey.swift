@@ -1,8 +1,8 @@
 import Foundation
 
-// Cod portabil (fara AppKit): se compileaza si se testeaza si pe Linux.
+// Portable code (no AppKit): it also compiles and is tested on Linux.
 
-/// O tasta modificatoare fizica ce poate face parte din combinatia de dictare.
+/// A physical modifier key that can be part of the dictation key combination.
 public enum ModifierKey: String, Codable, CaseIterable, Hashable, Sendable {
     case function
     case leftControl, rightControl
@@ -13,7 +13,7 @@ public enum ModifierKey: String, Codable, CaseIterable, Hashable, Sendable {
     public enum Family: String, Codable, CaseIterable, Hashable, Sendable {
         case function, control, option, shift, command
 
-        /// Ordinea Apple de afisare: fn ⌃ ⌥ ⇧ ⌘
+        /// Apple's display order: fn ⌃ ⌥ ⇧ ⌘
         var sortIndex: Int {
             switch self {
             case .function: return 0
@@ -44,7 +44,7 @@ public enum ModifierKey: String, Codable, CaseIterable, Hashable, Sendable {
             }
         }
 
-        /// Masca independenta de parte (CGEventFlags.maskControl etc.)
+        /// Side-independent mask (CGEventFlags.maskControl etc.)
         public var flagMask: UInt64 {
             switch self {
             case .function: return 0x0080_0000 // maskSecondaryFn
@@ -55,7 +55,7 @@ public enum ModifierKey: String, Codable, CaseIterable, Hashable, Sendable {
             }
         }
 
-        /// Tasta folosita cand evenimentul nu ne spune partea (stanga/dreapta).
+        /// The key used when the event does not tell us the side (left/right).
         var defaultKey: ModifierKey {
             switch self {
             case .function: return .function
@@ -84,7 +84,7 @@ public enum ModifierKey: String, Codable, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// Codul virtual macOS (kVK_*) al tastei.
+    /// The key's macOS virtual key code (kVK_*).
     public var keyCode: UInt16 {
         switch self {
         case .function: return 63
@@ -99,8 +99,8 @@ public enum ModifierKey: String, Codable, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// Bitul dependent de dispozitiv din CGEventFlags (NX_DEVICE*KEYMASK din IOKit).
-    /// Pentru fn nu exista bit pe parte, se foloseste maskSecondaryFn.
+    /// The device-dependent bit in CGEventFlags (NX_DEVICE*KEYMASK from IOKit).
+    /// fn has no per-side bit, so maskSecondaryFn is used.
     public var deviceFlagMask: UInt64 {
         switch self {
         case .function: return 0x0080_0000
@@ -119,9 +119,9 @@ public enum ModifierKey: String, Codable, CaseIterable, Hashable, Sendable {
         allCases.first { $0.keyCode == code }
     }
 
-    /// Calculeaza setul de modificatori apasati din flag-urile brute ale unui eveniment.
-    /// `changedKeyCode` (tasta care a generat evenimentul flagsChanged) ajuta cand
-    /// tastatura nu raporteaza bitii stanga/dreapta (ex: unele tastaturi externe / remote desktop).
+    /// Computes the set of pressed modifiers from the raw flags of an event.
+    /// `changedKeyCode` (the key that generated the flagsChanged event) helps when
+    /// the keyboard does not report the left/right bits (e.g. some external keyboards / remote desktop).
     public static func pressedKeys(flags: UInt64, changedKeyCode: UInt16? = nil) -> Set<ModifierKey> {
         var result = Set<ModifierKey>()
         for key in allCases where key != .function && (flags & key.deviceFlagMask) != 0 {
@@ -140,16 +140,16 @@ public enum ModifierKey: String, Codable, CaseIterable, Hashable, Sendable {
                 }
             }
         }
-        // Daca familia nu mai e activa, eliminam bitii dependenti ramasi (unele drivere nu ii curata).
+        // If the family is no longer active, drop the leftover device-dependent bits (some drivers do not clear them).
         result = result.filter { (flags & $0.family.flagMask) != 0 }
         return result
     }
 }
 
-/// Combinatia de taste tinuta apasat pentru dictare (doar modificatori, inclusiv fn).
+/// The key combination held down to dictate (modifiers only, including fn).
 public struct Hotkey: Codable, Hashable, Sendable {
     public var keys: Set<ModifierKey>
-    /// true = conteaza partea (ex: doar ⌥ din dreapta). false = orice ⌥.
+    /// true = the side matters (e.g. only the right ⌥). false = any ⌥.
     public var sideSpecific: Bool
 
     public init(keys: Set<ModifierKey>, sideSpecific: Bool = true) {
@@ -177,28 +177,28 @@ public struct Hotkey: Codable, Hashable, Sendable {
 
     private var families: Set<ModifierKey.Family> { Set(keys.map(\.family)) }
 
-    /// Combinatia e tinuta exact (fara alti modificatori).
+    /// The combination is held exactly (no other modifiers).
     public func isExactlyHeld(_ pressed: Set<ModifierKey>) -> Bool {
         guard isValid else { return false }
         if sideSpecific { return pressed == keys }
         return Set(pressed.map(\.family)) == families
     }
 
-    /// Toate tastele combinatiei sunt tinute (posibil si altele).
+    /// All the keys of the combination are held (possibly others too).
     public func isFullyHeld(in pressed: Set<ModifierKey>) -> Bool {
         guard isValid else { return false }
         if sideSpecific { return keys.isSubset(of: pressed) }
         return families.isSubset(of: Set(pressed.map(\.family)))
     }
 
-    /// Macar o tasta din combinatie e tinuta.
+    /// At least one key of the combination is held.
     public func overlaps(_ pressed: Set<ModifierKey>) -> Bool {
         if sideSpecific { return !keys.isDisjoint(with: pressed) }
         return !families.isDisjoint(with: Set(pressed.map(\.family)))
     }
 
-    /// Combinatie riscanta: un singur modificator "comun" (⌘/⌃/⌥/⇧) fara parte specificata
-    /// sau partea stanga - se apasa constant in scurtaturi.
+    /// Risky combination: a single "common" modifier (⌘/⌃/⌥/⇧) with no side specified
+    /// or on the left side - it is pressed all the time in shortcuts.
     public var isRiskySingleModifier: Bool {
         guard keys.count == 1, let key = keys.first else { return false }
         if key == .function { return false }
@@ -226,8 +226,8 @@ public struct Hotkey: Codable, Hashable, Sendable {
         return parts.joined(separator: sideSpecific ? " + " : "")
     }
 
-    /// Construieste combinatia dintr-o inregistrare (toate tastele apasate in timpul gestului).
-    /// Daca nu e implicata nicio tasta din dreapta, consideram ca partea nu conteaza.
+    /// Builds the combination from a recording (all the keys pressed during the gesture).
+    /// If no right-side key is involved, we assume the side does not matter.
     public static func fromRecording(_ keys: Set<ModifierKey>) -> Hotkey {
         let anyRight = keys.contains(where: \.isRightSide)
         return Hotkey(keys: keys, sideSpecific: anyRight || keys == [.function])
@@ -240,24 +240,24 @@ public struct HotkeyPreset: Identifiable, Hashable, Sendable {
     public let hotkey: Hotkey
 }
 
-/// Evenimente emise de masina de stari a combinatiei.
+/// Events emitted by the hotkey state machine.
 public enum HotkeyEvent: Equatable, Sendable {
-    /// Combinatia a fost apasata: porneste inregistrarea (push-to-talk).
+    /// The combination was pressed: start recording (push-to-talk).
     case pressBegan
-    /// Combinatia a fost eliberata dupa o apasare lunga: opreste si proceseaza.
+    /// The combination was released after a long press: stop and process.
     case pressEnded
-    /// Combinatia a fost folosita in alta scurtatura (s-a apasat alta tasta): renunta.
+    /// The combination was used in another shortcut (another key was pressed): discard.
     case pressAborted
-    /// Apasare prea scurta: renunta (poate deveni dublu-tap).
+    /// Press too short: discard (it may become a double tap).
     case tapped
-    /// Dublu-tap: inregistrare hands-free (continua dupa eliberare).
+    /// Double tap: hands-free recording (continues after release).
     case handsFreeStarted
-    /// In modul hands-free combinatia a fost apasata din nou: opreste si proceseaza.
+    /// In hands-free mode, the combination was pressed again: stop and process.
     case handsFreeStopRequested
 }
 
-/// Masina de stari pura pentru push-to-talk + dublu-tap hands-free.
-/// Primeste setul de modificatori apasati si apasarile de taste obisnuite, cu timestamp.
+/// Pure state machine for push-to-talk + hands-free double tap.
+/// It receives the set of pressed modifiers and the regular key presses, with timestamps.
 public struct HotkeyStateMachine: Sendable {
     public enum State: Equatable, Sendable {
         case idle
@@ -270,12 +270,12 @@ public struct HotkeyStateMachine: Sendable {
 
     public var hotkey: Hotkey
     public var handsFreeEnabled: Bool
-    /// Sub acest prag, apasarea e considerata "tap" (nu dictare).
+    /// Below this threshold, the press counts as a "tap" (not dictation).
     public var tapThreshold: TimeInterval
-    /// Fereastra in care al doilea tap activeaza hands-free.
+    /// The window in which the second tap activates hands-free mode.
     public var doubleTapWindow: TimeInterval
-    /// Cat timp de la apasare o alta tasta (sau alt modificator) inseamna o scurtatura (ex: fn + sageti) si anuleaza
-    /// dictarea. Dupa aceea, o tasta apasata din greseala, sau ca sa opresti screensaver-ul, nu mai pierde inregistrarea.
+    /// How long after the press another key (or another modifier) means a shortcut (e.g. fn + arrows) and cancels
+    /// the dictation. After that, a key pressed by mistake, or to stop the screensaver, no longer loses the recording.
     public var shortcutWindow: TimeInterval
 
     public private(set) var state: State = .idle
@@ -307,12 +307,12 @@ public struct HotkeyStateMachine: Sendable {
         case .pressed(let since):
             if exact { return [] }
             if full {
-                // S-a adaugat alt modificator: la inceput e alta scurtatura; dupa fereastra il ignoram.
+                // Another modifier was added: early on it is another shortcut; after the window we ignore it.
                 guard time - since < shortcutWindow else { return [] }
                 state = .waitingForRelease
                 return [.pressAborted]
             }
-            // Cel putin o tasta din combinatie a fost eliberata.
+            // At least one key of the combination was released.
             if time - since < tapThreshold {
                 if handsFreeEnabled {
                     state = .awaitingSecondTap(releasedAt: time)
@@ -353,11 +353,11 @@ public struct HotkeyStateMachine: Sendable {
         }
     }
 
-    /// O tasta obisnuita (non-modificator) a fost apasata.
+    /// A regular (non-modifier) key was pressed.
     public mutating func keyDown(at time: TimeInterval) -> [HotkeyEvent] {
         switch state {
         case .pressed(let since):
-            // Dupa fereastra scurtaturilor, dictarea continua (vezi shortcutWindow).
+            // After the shortcut window, the dictation continues (see shortcutWindow).
             guard time - since < shortcutWindow else { return [] }
             state = .waitingForRelease
             return [.pressAborted]
@@ -369,7 +369,7 @@ public struct HotkeyStateMachine: Sendable {
         }
     }
 
-    /// Readuce masina in repaus (ex: dupa anulare cu Esc).
+    /// Puts the machine back to idle (e.g. after canceling with Esc).
     public mutating func reset() {
         state = hotkey.overlaps(pressed) ? .waitingForRelease : .idle
     }
@@ -381,13 +381,13 @@ public struct HotkeyStateMachine: Sendable {
     }
 }
 
-/// Inregistreaza o combinatie noua: retine toate tastele apasate pana se elibereaza totul.
+/// Records a new combination: collects every key pressed until everything is released.
 public struct HotkeyCapture: Sendable {
     public private(set) var collected: Set<ModifierKey> = []
 
     public init() {}
 
-    /// Returneaza combinatia cand toate tastele au fost eliberate.
+    /// Returns the combination once all the keys have been released.
     public mutating func update(_ pressed: Set<ModifierKey>) -> Hotkey? {
         if !pressed.isEmpty {
             collected.formUnion(pressed)
