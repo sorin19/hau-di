@@ -1,0 +1,2 @@
+# Keep the signing Team (DEVELOPMENT_TEAM) out of commits: see Tools/git-clean-team.sh.
+*.pbxproj filter=noteam
