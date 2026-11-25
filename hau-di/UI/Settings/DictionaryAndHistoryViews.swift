@@ -30,7 +30,7 @@ struct DictionarySettingsView: View {
     var body: some View {
         Form {
             Section("Personal dictionary") {
-                Text("Names, technical terms, brands. Claude gets all of them and writes them exactly like this; the first ones (as many as fit in the ~120-token hint) also go to Whisper. New terms go at the start.")
+                Text("Names, technical terms, brands. Claude gets all of them and writes them exactly like this; the first ones (as many as fit in the ~110-token hint) also go to Whisper. New terms go at the start.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

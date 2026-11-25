@@ -8,10 +8,11 @@ actor WhisperKitEngine: SpeechEngine {
     /// The dictionary prompt for the last list received (recomputed only when the list changes).
     private var promptCache: (vocabulary: [String], count: Int, tokens: [Int])?
 
-    /// The dictionary reaches Whisper as "previous text": at most this many terms and tokens (Whisper accepts up to
-    /// 224 context tokens; more would take away from the attention given to the audio).
+    /// The dictionary reaches Whisper as "previous text": at most this many terms and tokens. WhisperKit keeps only
+    /// the last 111 prompt tokens (224 / 2 - 1) and drops those before them, which are the first terms; and every
+    /// prompt token is one less for the text of each piece of audio (see AudioSplitter).
     static let maxPromptTerms = 60
-    static let maxPromptTokens = 120
+    static let maxPromptTokens = 111
 
     init(variant: String) {
         self.variant = variant
@@ -148,6 +149,8 @@ actor WhisperKitEngine: SpeechEngine {
 
         // The language is always forced (no detection): Whisper transcribes in the chosen language and doesn't
         // translate (see DictationLanguage).
+        // No chunkingStrategy: long recordings are split here, into pieces short enough for their whole text to fit
+        // next to the prompt (WhisperKit's own split makes pieces of up to 30 s, whose end was lost).
         let options = DecodingOptions(
             verbose: false,
             task: .transcribe,
@@ -158,11 +161,13 @@ actor WhisperKitEngine: SpeechEngine {
             detectLanguage: false,
             skipSpecialTokens: true,
             withoutTimestamps: true,
-            promptTokens: promptTokens,
-            chunkingStrategy: .vad
+            promptTokens: promptTokens
         )
         let audio = AudioAnalysis.padded(samples, trailingSilence: 0.2, minimumDuration: 1.0)
-        let results = try await pipe.transcribe(audioArray: audio, decodeOptions: options)
+        let budget = AudioSplitter.textTokens(promptTokens: promptTokens?.count ?? 0)
+        let pieces = AudioSplitter.split(audio, maxSeconds: AudioSplitter.maxPieceSeconds(textTokens: budget))
+            .map { Array(audio[$0]) }
+        let results = try await decode(pieces, options: options, budget: budget, splitsLeft: 2, pipe: pipe)
         let text = results.map(\.text).joined(separator: " ")
 
         // Each word's probability, from those of its tokens: they come with every transcription, so without
@@ -170,6 +175,40 @@ actor WhisperKitEngine: SpeechEngine {
         guard let tokenizer = pipe.tokenizer else { return SpeechTranscript(text: text) }
         let segments = results.flatMap(\.segments).map { Self.words(in: $0, tokenizer: tokenizer) }
         return SpeechTranscript(text: text, words: WordConfidence.joined(segments))
+    }
+
+    /// Each piece decoded in a window of its own (WhisperKit runs them in parallel), the results in order. A piece
+    /// whose text used up the whole budget was cut off before its end: it is cut in two at its quietest point and
+    /// decoded again (at most splitsLeft times in a row).
+    private func decode(_ pieces: [[Float]], options: DecodingOptions, budget: Int, splitsLeft: Int,
+                        pipe: WhisperKit) async throws -> [TranscriptionResult] {
+        let outcomes = await pipe.transcribeWithResults(audioArrays: pieces, decodeOptions: options)
+        guard outcomes.count == pieces.count else {
+            // WhisperKit answers a malformed request with a single failure: that error is thrown here.
+            _ = try outcomes.first?.get()
+            throw SpeechEngineError.transcriptionFailed("\(outcomes.count) results for \(pieces.count) pieces of audio")
+        }
+        var results: [TranscriptionResult] = []
+        for (piece, outcome) in zip(pieces, outcomes) {
+            let pieceResults = try outcome.get()
+            if splitsLeft > 0, let tokenizer = pipe.tokenizer,
+               Self.textTokenCount(pieceResults, tokenizer: tokenizer) >= budget,
+               let halves = AudioSplitter.halves(piece) {
+                Log.asr.notice("A piece of \(piece.count / 16_000) s filled its \(budget) tokens; decoding it again in two halves.")
+                results += try await decode(halves.map { Array(piece[$0]) }, options: options, budget: budget,
+                                            splitsLeft: splitsLeft - 1, pipe: pipe)
+            } else {
+                results += pieceResults
+            }
+        }
+        return results
+    }
+
+    /// The text tokens of a piece's results (without the special ones: start of transcript, language, end).
+    private static func textTokenCount(_ results: [TranscriptionResult], tokenizer: WhisperTokenizer) -> Int {
+        results.flatMap(\.segments).reduce(0) { count, segment in
+            count + segment.tokens.filter { $0 < tokenizer.specialTokens.specialTokenBegin }.count
+        }
     }
 
     /// How many dictionary terms (from the start of the list) reach Whisper; nil while the model isn't loaded.

@@ -11,12 +11,14 @@ enum SpeechEngineError: LocalizedError {
     case notLoaded
     case modelUnavailable(String)
     case stillDownloading(Int)
+    case transcriptionFailed(String)
 
     var errorDescription: String? {
         switch self {
         case .notLoaded: return "The transcription model isn't loaded yet."
         case .modelUnavailable(let detail): return "The transcription model isn't available: \(detail)"
         case .stillDownloading(let percent): return "The model is still downloading (\(percent)%). Try again once it's done."
+        case .transcriptionFailed(let detail): return "The transcription failed: \(detail)"
         }
     }
 }
