@@ -637,14 +637,19 @@ private struct HistoryRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if entry.rawText != entry.finalText {
-                DisclosureGroup("Raw transcript", isExpanded: $showRaw) {
-                    Text(entry.rawText)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                // Not a DisclosureGroup: on macOS only its arrow responds to clicks, not the title.
+                VStack(alignment: .leading, spacing: 6) {
+                    DisclosureToggle(title: "Raw transcript", isExpanded: $showRaw)
+                        .font(.caption)
+                    if showRaw {
+                        Text(entry.rawText)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, DisclosureToggle.indent)
+                    }
                 }
-                .font(.caption)
             }
 
             if let note = entry.note {
@@ -685,5 +690,58 @@ private struct HistoryRow: View {
         // There are several Whisper variants (Turbo, compressed, Small): the model stays useful for comparisons.
         parts.append(entry.engine)
         return parts.joined(separator: " · ")
+    }
+}
+
+/// An arrow and a title that open and close a section below: the whole label is clickable, with a subtle
+/// background on hover and on press (like the icon buttons), without taking up more room than the text.
+private struct DisclosureToggle: View {
+    let title: String
+    @Binding var isExpanded: Bool
+
+    /// How far the section's content is indented: the arrow and the space after it.
+    static let indent: CGFloat = 14
+
+    var body: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) { isExpanded.toggle() }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .frame(width: Self.indent - 4)
+                Text(verbatim: title)
+            }
+        }
+        .buttonStyle(DisclosureToggleStyle())
+        .accessibilityValue(isExpanded ? "Expanded" : "Collapsed")
+    }
+}
+
+private struct DisclosureToggleStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        DisclosureToggleLabel(configuration: configuration)
+    }
+}
+
+private struct DisclosureToggleLabel: View {
+    let configuration: ButtonStyleConfiguration
+    @State private var hovering = false
+
+    var body: some View {
+        configuration.label
+            .padding(.horizontal, 5)
+            .padding(.vertical, 2)
+            .background(
+                RoundedRectangle(cornerRadius: 5, style: .continuous)
+                    .fill(Color.primary.opacity(configuration.isPressed ? 0.16 : hovering ? 0.09 : 0))
+            )
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            // The background reaches past the text, but the layout keeps the text's size and position.
+            .padding(.horizontal, -5)
+            .padding(.vertical, -2)
     }
 }

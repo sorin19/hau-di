@@ -48,7 +48,7 @@ final class AudioSplitterTests: XCTestCase {
     }
 
     func testCutsInThePauses() {
-        // 40 s of continuous dictation with short pauses (0.3 s): the cuts land inside them.
+        // 40 s of continuous dictation with short pauses (0.3 s): 3 pieces (the fewest), each cut inside a pause.
         let pauses: [(at: Double, length: Double)] = [(4, 0.3), (11.2, 0.3), (15.5, 0.3), (24.1, 0.3), (31, 0.3), (37, 0.3)]
         let samples = speech(seconds: 40, pauses: pauses)
         let pieces = AudioSplitter.split(samples, maxSeconds: 17.8)
@@ -58,20 +58,44 @@ final class AudioSplitterTests: XCTestCase {
             let at = seconds(cut)
             XCTAssertTrue(pauses.contains { at > $0.at && at < $0.at + $0.length }, "cut at \(at) s is not in a pause")
         }
-        // The latest pause allowed: 15.5 s (in the second half of the first 17.8 s), then 31 s.
-        XCTAssertTrue((15.5...15.8).contains(seconds(pieces[0].upperBound)))
-        XCTAssertTrue((31...31.3).contains(seconds(pieces[1].upperBound)))
+    }
+
+    func testPrefersTheLongestPause() {
+        // A sentence end (0.6 s) and, later, a short pause between words (0.25 s): the cut goes in the sentence end.
+        let samples = speech(seconds: 26, pauses: [(10, 0.6), (16, 0.25)], floor: 0.002)
+        let pieces = AudioSplitter.split(samples, maxSeconds: 17.8)
+        assertCoversEverything(pieces, count: samples.count, maxSeconds: 17.8)
+        XCTAssertEqual(pieces.count, 2)
+        XCTAssertEqual(seconds(pieces[0].upperBound), 10.3, accuracy: 0.03)
+    }
+
+    func testKeepsTheFewestPieces() {
+        // Cutting at the long pause (10 s) would leave 20 s, which needs two more pieces: the short pause it is.
+        let samples = speech(seconds: 30, pauses: [(10, 0.6), (16, 0.25)], floor: 0.002)
+        let pieces = AudioSplitter.split(samples, maxSeconds: 17.8)
+        assertCoversEverything(pieces, count: samples.count, maxSeconds: 17.8)
+        XCTAssertEqual(pieces.count, 2)
+        XCTAssertEqual(seconds(pieces[0].upperBound), 16.125, accuracy: 0.03)
+    }
+
+    func testPausesInANoisyRoom() {
+        // Background noise everywhere (about -37 dBFS); the pauses are only noise, the longer one wins.
+        var samples = speech(seconds: 30, pauses: [(13, 0.3), (15, 0.5)], floor: 0.02)
+        for index in samples.indices { samples[index] += 0.02 * sin(Float(index) * 1.7) }
+        let pieces = AudioSplitter.split(samples, maxSeconds: 17.8)
+        XCTAssertEqual(pieces.count, 2)
+        XCTAssertEqual(seconds(pieces[0].upperBound), 15.25, accuracy: 0.03)
     }
 
     func testWithoutPausesCutsAtTheQuietestMoment() {
-        // No silence at all, just a moment (12.3-12.5 s) that is quieter than the rest.
+        // No silence at all, just a moment (14.3-14.5 s) that is quieter than the rest.
         var samples = speech(seconds: 30)
-        let quiet = Int(12.3 * Double(rate))
+        let quiet = Int(14.3 * Double(rate))
         for index in quiet..<(quiet + 3_200) { samples[index] *= 0.05 }
         let pieces = AudioSplitter.split(samples, maxSeconds: 17.8)
         assertCoversEverything(pieces, count: samples.count, maxSeconds: 17.8)
         XCTAssertEqual(pieces.count, 2)
-        XCTAssertEqual(seconds(pieces[0].upperBound), 12.4, accuracy: 0.02)
+        XCTAssertEqual(seconds(pieces[0].upperBound), 14.4, accuracy: 0.02)
     }
 
     func testNeverLeavesATinyLastPiece() {
@@ -87,7 +111,7 @@ final class AudioSplitterTests: XCTestCase {
         let samples = speech(seconds: 137, pauses: stride(from: 3.0, to: 137, by: 5.5).map { ($0, 0.25) })
         let pieces = AudioSplitter.split(samples, maxSeconds: 17.8)
         assertCoversEverything(pieces, count: samples.count, maxSeconds: 17.8)
-        XCTAssertGreaterThanOrEqual(pieces.count, 8)
+        XCTAssertEqual(pieces.count, 8, "ceil(137 / 17.8)")
     }
 
     func testHalves() {

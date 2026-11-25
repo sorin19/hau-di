@@ -312,8 +312,26 @@ final class WindowManager: NSObject, NSWindowDelegate {
         }
         // While the window is open, the app appears in the Dock and in ⌘⇥.
         NSApp.setActivationPolicy(.regular)
+        bringToFront()
+        // The menu bar panel closes in the meantime, and macOS can give the focus back to the app that had it
+        // (Terminal...), leaving the window behind it: once the panel is gone, the window comes forward again.
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard let self, self.isSettingsVisible, !(NSApp.isActive && self.window?.isKeyWindow == true) else { return }
+            self.bringToFront()
+        }
+    }
+
+    private func bringToFront() {
+        guard let window else { return }
+        // macOS 14+ activates apps cooperatively: NSApp.activate() can be declined while another app is active,
+        // which is usually the case for a menu bar app. The older call asks for it outright, which is what a click
+        // on Settings… or History means.
         NSApp.activate()
-        window?.makeKeyAndOrderFront(nil)
+        (NSApp as LegacyActivation).activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+        // In front of the other apps' windows even if macOS still declines to activate hau-di.
+        window.orderFrontRegardless()
     }
 
     var isSettingsVisible: Bool { window?.isVisible == true }
@@ -326,3 +344,12 @@ final class WindowManager: NSObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.accessory)
     }
 }
+
+/// NSApplication.activate(ignoringOtherApps:), deprecated in macOS 14 but still honored, called without the
+/// deprecation warning (see WindowManager.bringToFront).
+@MainActor
+private protocol LegacyActivation {
+    func activate(ignoringOtherApps flag: Bool)
+}
+
+extension NSApplication: LegacyActivation {}
